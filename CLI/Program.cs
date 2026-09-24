@@ -40,6 +40,7 @@ namespace WasmBridge.CLI
                     o.WasmFile = Required(p, "wasm");
                     o.FallbackFile = Required(p, "fallback");
                     o.RuntimeFile = Required(p, "runtime");
+                    if (p.ContainsKey("adapter")) o.AdapterFile = p["adapter"];
                     o.OutputDirectory = Required(p, "out");
                     if (p.ContainsKey("export")) o.ExportName = p["export"];
                     Console.WriteLine("Package manifest: " + WasmPackage.Create(o));
@@ -232,6 +233,7 @@ namespace WasmBridge.CLI
             Console.WriteLine("  build --source Core\\math.c --out add.wasm [--clang path] [--export add]");
             Console.WriteLine("  build --source Core\\image.c --out rgba.wasm --export wb_rgba_buffer,wb_rgba_capacity,wb_rgba_invert");
             Console.WriteLine("  package --wasm add.wasm --fallback Examples\\HelloWorld\\add.js --runtime Runtime\\wasmbridge.js --out dist [--export add]");
+            Console.WriteLine("  package supports optional --adapter Runtime\\buffers.js for multi-buffer modules.");
             Console.WriteLine("  verify --wasm add.wasm     (header only)");
             Console.WriteLine("  self-test                   (managed header, native RGBA8 and buffer-manager tests)");
             Console.WriteLine("For multiple exports, provide comma-separated names with no spaces.");

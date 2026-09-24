@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WasmBridge - RGBA buffer and Canvas test (Firefox 52)</title>
+<style>
+body { font: 14px Arial, sans-serif; max-width: 950px; margin: 24px auto; padding: 0 16px; color: #242424; }
+h1 { font-size: 22px; }
+.controls { padding: 10px; background: #f0f2f5; border: 1px solid #b6bec8; }
+.controls button { margin: 0 8px; }
+.canvases { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 14px; }
+.panel { width: 280px; }
+canvas { display: block; width: 256px; height: 160px; border: 1px solid #888; background: #fff; }
+pre { white-space: pre-wrap; background: #f8f8f8; border: 1px solid #aaa; padding: 10px; line-height: 1.35; }
+p { line-height: 1.4; }
+</style>
+<script src="../../Runtime/wasmbridge.js"></script>
+<script src="../../Runtime/rgba.js"></script>
+</head>
+<body>
+<h1>WasmBridge: RGBA memory + Canvas</h1>
+<p>WebAssembly and a matching JavaScript implementation invert RGB pixels inside a reusable, bounded
+RGBA8 buffer. Alpha is preserved. The program copies the result into a fresh Canvas ImageData.</p>
+<div class="controls">
+<label><input type="checkbox" id="force-js"> Force JavaScript fallback</label>
+<button type="button" id="run">Run image test</button>
+<label>Optional image: <input type="file" id="upload" accept="image/*"></label>
+<br><small>Images larger than 512 x 512 are scaled down. Default sample is 256 x 160.
+The test also compares against a separate reference algorithm.</small>
+</div>
+<div class="canvases">
+<div class="panel"><strong>Original</strong><canvas id="original" width="256" height="160"></canvas></div>
+<div class="panel"><strong>Inverted</strong><canvas id="result" width="256" height="160"></canvas></div>
+</div>
+<pre id="status">Preparing image test...</pre>
+<script>
+(function () {
+    "use strict";
+    var original = document.getElementById("original");
+    var result = document.getElementById("result");
+    var status = document.getElementById("status");
+    var forceJS = document.getElementById("force-js");
+    var upload = document.getElementById("upload");
+    var generation = 0;
+    var sourceWidth = 256, sourceHeight = 160, source = null;
+
+    function sample(width, height) {
+        var data = new Uint8ClampedArray(width * height * 4);
+        for (var y = 0; y < height; ++y) {
+            for (var x = 0; x < width; ++x) {
+                var i = (y * width + x) * 4;
+                data[i] = (x * 255 / (width - 1)) | 0;
+                data[i + 1] = (y * 255 / (height - 1)) | 0;
+                data[i + 2] = ((x + y) * 255 / (width + height - 2)) | 0;
+                data[i + 3] = ((x / 16 | 0) + (y / 16 | 0)) % 4 === 0 ? 96 : 255;
+            }
+        }
+        return data;
+    }
+
+    function paint(canvas, pixels, width, height) {
+        canvas.width = width;
+        canvas.height = height;
+        var ctx = canvas.getContext("2d");
+        var image = ctx.createImageData(width, height);
+        image.data.set(pixels);
+        ctx.putImageData(image, 0, 0);
+        canvas.style.width = width + "px";
+        canvas.style.height = height + "px";
+        canvas.parentNode.style.width = Math.max(width, 180) + "px";
+    }
+
+    function reference(pixels) {
+        var out = new Uint8ClampedArray(pixels.length);
+        for (var i = 0; i < pixels.length; i += 4) {
+            out[i] = 255 - pixels[i];
+            out[i + 1] = 255 - pixels[i + 1];
+            out[i + 2] = 255 - pixels[i + 2];
+            out[i + 3] = pixels[i + 3];
+        }
+        return out;
+    }
+
+    function equalBytes(a, b) {
+        if (a.length !== b.length) return false;
+        for (var i = 0; i < a.length; ++i) if (a[i] !== b[i]) return false;
+        return true;
+    }
+
+    function loadProcessor(preferWasm) {
+        return WasmBridgeRGBA.load({
+            wasm: "rgba.wasm",
+            fallback: "rgba-fallback.js",
+            fallbackGlobal: "WasmBridgeRGBAFallback",
+            preferWasm: preferWasm
+        });
+    }
+
+    function run() {
+        var myRun = ++generation;
+        var width = sourceWidth, height = sourceHeight;
+        var input = new Uint8ClampedArray(source);
+        var checked = forceJS.checked;
+        paint(original, input, width, height);
+        status.textContent = "Loading backend and processing " + width + " x " + height + "...";
+        loadProcessor(!checked).then(function (primary) {
+            var output = primary.processRGBA(input, width, height);
+            var expected = reference(input);
+            var correct = equalBytes(output, expected);
+            var unchanged = equalBytes(input, source);
+            function render(parity, parityLabel) {
+                if (myRun !== generation) return;
+                paint(result, output, width, height);
+                status.textContent =
+                    (correct && unchanged && parity ? "PASS" : "FAIL") +
+                    ": " + width + " x " + height + " (" + input.length + " RGBA bytes)" +
+                    "\nSelected backend: " + primary.backend +
+                    "\nWasm/JS vs reference: " + (correct ? "PASS" : "FAIL") +
+                    "\nInput unchanged: " + (unchanged ? "PASS" : "FAIL") +
+                    "\n" + parityLabel + ": " + (parity ? "PASS" : "FAIL") +
+                    "\nDiagnostics: " + (primary.diagnostic || "(none)") +
+                    "\nBrowser: " + navigator.userAgent;
+            }
+            if (primary.backend !== "wasm") {
+                render(true, "Fallback selected");
+                return;
+            }
+            return loadProcessor(false).then(function (js) {
+                var jsOutput = js.processRGBA(input, width, height);
+                render(equalBytes(output, jsOutput), "Wasm vs JS identical");
+            });
+        }).catch(function (error) {
+            if (myRun === generation) status.textContent = "FAIL: " + error.message;
+        });
+    }
+
+    upload.onchange = function () {
+        if (!upload.files || !upload.files.length) return;
+        var url = URL.createObjectURL(upload.files[0]);
+        var image = new Image();
+        image.onload = function () {
+            URL.revokeObjectURL(url);
+            var scale = Math.min(1, 512 / image.width, 512 / image.height);
+            var width = Math.max(1, Math.floor(image.width * scale));
+            var height = Math.max(1, Math.floor(image.height * scale));
+            var canvas = document.createElement("canvas");
+            canvas.width = width; canvas.height = height;
+            var ctx = canvas.getContext("2d");
+            ctx.drawImage(image, 0, 0, width, height);
+            try {
+                source = new Uint8ClampedArray(ctx.getImageData(0, 0, width, height).data);
+                sourceWidth = width; sourceHeight = height;
+                run();
+            } catch (error) { status.textContent = "FAIL loading image: " + error.message; }
+        };
+        image.onerror = function () { URL.revokeObjectURL(url); status.textContent = "Unable to decode image."; };
+        image.src = url;
+    };
+    document.getElementById("run").onclick = run;
+    source = sample(sourceWidth, sourceHeight);
+    run();
+}());
+</script>
+</body>
+</html>

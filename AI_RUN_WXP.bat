@@ -1,7 +1,8 @@
 @echo off
 setlocal
 
-rem Repository-local unattended CLI smoke test. This does NOT test Firefox/WASM execution.
+rem Unattended XP test: managed header plus v141_xp native RGBA sample.
+rem This does NOT test Firefox/WebAssembly execution.
 rem Preserve the operator's existing remote root and DBGRun installation.
 set "PROGNAME=WasmBridge"
 set "REPONAME=WasmBridge"
@@ -35,10 +36,12 @@ if exist "%DBGOUT%" type "%DBGOUT%" >>"%OUT%"
 rem Do not report success merely because the launcher returned 0.
 findstr /C:"PASS: valid and invalid headers handled." "%OUT%" >nul 2>&1
 if errorlevel 1 set "RC=1"
+findstr /C:"PASS: native RGBA8 inversion, alpha and bounds handled." "%OUT%" >nul 2>&1
+if errorlevel 1 set "RC=1"
 
 if not "%RC%"=="0" (
     echo RUN FAILED: self-test result was not verified. >>"%OUT%"
 ) else (
-    echo RUN PASS: managed header parser self-test only. >>"%OUT%"
+    echo RUN PASS: managed header parser and native RGBA8 self-test. >>"%OUT%"
 )
 endlocal & exit /b %RC%

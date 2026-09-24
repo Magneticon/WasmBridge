@@ -1,21 +1,28 @@
 # WasmBridge
 
-Reusable WebAssembly build/packaging tools and an optional browser runtime for Firefox 52.9 ESR on Windows XP (32-bit browser), with JavaScript fallback and newer-browser support.
+Reusable WebAssembly compilation, packaging, and browser-runtime framework. The baseline browser is **Firefox 52 on Windows XP x64** (32-bit browser process), with additional support for newer browsers and a matching JavaScript fallback.
 
-**Status:** early prototype. The native Windows build is a Visual Studio 2022 **.sln** (no .slnx). Windows binaries target **WXP only**, using native `v141_xp` and managed **.NET Framework 4.0**. Both x86 and x64 solution platforms are retained; the Windows 10 workstation may build the XP-targeted binaries, but there is no separate W10 target. Building a Windows DLL is separate from building a portable wasm32 module with external LLVM/Clang.
+**Windows builds are XP-only.** Use Visual Studio 2022 with the traditional `WasmBridge.sln` (no .slnx), native `v141_xp`, .NET Framework 4.0, and x86/x64 configurations. The Windows 10 workstation is the build host; there is no separate W10 build/run configuration or repository-local build CMD script.
 
-The managed CLI remains `WasmBridge.exe`; the managed API is now `WasmBridge.Core.dll` (namespace `WasmBridge`) to avoid a CLR assembly-name collision that caused `System.TypeLoadException` on XP. See `Documentation/GETTING_STARTED.md` for details and smoke-test instructions. The baseline demo exports `add(i32, i32) -> i32`, including a JS fallback. Browser execution on actual XP/Firefox 52 is **not yet verified**.
+## Status
 
-## Layout
+- The user verified the numeric `add(20,22) = 42` sample running on **Wasm** and with **forced JavaScript fallback** in Firefox 52 on Windows XP x64. On the tested installation, the page also loaded through `file://`. This verifies the first numeric export, not the new RGBA pipeline.
+- The XP x64 CLI build and managed self-test passed. The subsequent v0.2 native RGBA extension and browser memory tests still require a fresh XP cycle.
+- The managed CLI `WasmBridge.exe` uses the managed API `WasmBridge.Core.dll` (namespace `WasmBridge`) to avoid the original CLR assembly-name collision. `WasmBridge.Native.dll` is the separate XP-native sample library.
+- The checked-in `Examples/ImageProcessing/rgba.wasm` was compiled from the shared C source with freestanding wasm32 Clang 17 and is intended for a Firefox 52 MVP test. Its image-buffer API and JS fallback were exercised in a developer-host Node test, **not yet in the actual XP browser**.
 
-- `WasmBridge.sln`: managed API (`WasmBridge.Core.dll`), CLI (`WasmBridge.exe`) and optional native sample DLL.
-- `Core/math.c`: same portable C algorithm for native DLL and wasm32.
-- `Runtime/wasmbridge.js`: browser feature-detection, load, export validation and fallback.
-- `Examples/HelloWorld/`: test harness and fallback implementation.
-- `Tests/`: browser and managed tests.
-- Windows builds use the operator's existing external AIEXE/MSBuild workflow; there are no repository-local build scripts.
+## Samples and components
 
-The existing external AIEXE workflow builds and tests the XP target; no repository-local build CMD scripts or W10 runner are required.
+- `Examples/HelloWorld/index.html`: existing numeric Wasm/JS test.
+- `Examples/ImageProcessing/index.html`: **new** RGBA8 → inverted image demo, generated test image or uploaded image (scaled to at most 512×512), two HTML canvases, comparison with a JS reference, backend/diagnostic display, and forced JS fallback.
+- `Core/image.c`, `Core/image.h`: portable C RGBA8 algorithm used by both the native DLL and wasm32 module.
+- `Runtime/rgba.js`: module-memory adapter exposing `processRGBA(pixelArray, width, height)` and returning an independent `Uint8ClampedArray`.
+- `Examples/ImageProcessing/rgba-fallback.js`: JS backend with an equivalent bounded scratch-buffer ABI.
+- `Runtime/wasmbridge.js`: existing Wasm loader, with optional `validateWasm` hook for memory/export ABI checks before choosing a backend.
+- `Tests/test_rgba_node.js` and `Tests/test_native.c`: optional development-host correctness tests. These do not replace XP testing.
 
-The name **MIRAE** is reserved for the separate browser desktop project. WasmBridge is independent of MIRAE and ATALANTA WebUI.
+The RGBA demo supports tightly packed, row-major RGBA8 buffers, 1–512 pixels per dimension, in-place RGB inversion and unchanged alpha. The module owns one reusable scratch buffer (no malloc/free); the adapter copies input/output to avoid exposing mutable Wasm memory outside a synchronous call. Separate concurrent instances need their own memory or serialized calls.
 
+See [Documentation/GETTING_STARTED.md](Documentation/GETTING_STARTED.md) for build prerequisites and manual XP/Firefox image tests. The operator's existing external AIEXE/MSBuild workflow handles compilation and XP runs; `AI_RUN_WXP.bat` tests the managed header parser and XP-native RGBA8 implementation.
+
+WasmBridge is independent of MIRAE and ATALANTA WebUI.

@@ -57,7 +57,7 @@ namespace WasmBridge
             manifest["wasm"] = "module.wasm";
             manifest["fallback"] = "fallback.js";
             manifest["runtime"] = "wasmbridge.js";
-            manifest["exports"] = new string[] { options.ExportName };
+            manifest["exports"] = options.ExportName.Split(',');
             manifest["wasmSha256"] = Sha256(wasm);
             manifest["fallbackSha256"] = Sha256(fallback);
             manifest["runtimeSha256"] = Sha256(runtime);

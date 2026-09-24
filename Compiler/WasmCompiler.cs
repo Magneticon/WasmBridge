@@ -34,8 +34,11 @@ namespace WasmBridge
                 throw new FileNotFoundException("C source not found.", options.SourceFile);
             if (String.IsNullOrEmpty(options.OutputFile)) throw new ArgumentException("OutputFile is required.");
             if (String.IsNullOrEmpty(options.ClangPath)) throw new ArgumentException("ClangPath is required.");
-            if (!Regex.IsMatch(options.ExportName ?? "", @"^[A-Za-z_][A-Za-z0-9_]*$"))
-                throw new ArgumentException("ExportName must be a simple C symbol.");
+            string[] exportNames = (options.ExportName ?? "").Split(',');
+            if (exportNames.Length == 0) throw new ArgumentException("At least one export is required.");
+            foreach (string exportName in exportNames)
+                if (!Regex.IsMatch(exportName, @"^[A-Za-z_][A-Za-z0-9_]*$"))
+                    throw new ArgumentException("Exports must be comma-separated simple C symbols.");
             if (options.TimeoutMilliseconds <= 0) throw new ArgumentException("TimeoutMilliseconds must be positive.");
 
             string source = Path.GetFullPath(options.SourceFile);
@@ -45,9 +48,10 @@ namespace WasmBridge
             Directory.CreateDirectory(Path.GetDirectoryName(output));
 
             // MVP-oriented freestanding C example. Toolchain/version/features still require real browser testing.
-            string args = "--target=wasm32 -O2 -nostdlib " +
-                "-Wl,--no-entry -Wl,--export=" + options.ExportName +
-                " -Wl,--strip-all -o " + Quote(output) + " " + Quote(source);
+            string args = "--target=wasm32 -O2 -nostdlib -Wl,--no-entry -Wl,--export-memory";
+            foreach (string exportName in exportNames)
+                args += " -Wl,--export=" + exportName;
+            args += " -Wl,--strip-all -o " + Quote(output) + " " + Quote(source);
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = options.ClangPath;
             psi.Arguments = args;

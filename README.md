@@ -14,9 +14,11 @@ Reusable WebAssembly compilation, packaging, and browser-runtime framework. The 
 ## v0.3 — dynamically managed independent buffers
 
 - `Examples/BufferArena/index.html`: **new** Firefox 52 test for independently owned buffers, release/reuse, retained data across memory growth, 64–1024 pixel RGBA images, Wasm/JS parity, and end-to-end timing.
-- `Runtime/buffers.js`: reusable JS API: `allocate(bytes)`, `write(handle, typedArray)`, `read(handle, bytes)`, `release(handle)`, `invertRGBA(source, destination, width, height)`, `processRGBA(pixels, width, height)`, and `statistics()`.
+- `Runtime/buffers.js`: reusable JS API: `allocate(bytes)`, `write(handle, typedArray)`, `read(handle, bytes)`, `writeTyped(handle, type, array)`, `readTyped(handle, type, count)`, `release(handle)`, `invertRGBA(source, destination, width, height)`, `processRGBA(pixels, width, height)`, and `statistics()`.
 - `Core/buffers.c` and `Core/buffers.h`: shared native XP and wasm32 allocator/processing functions. `Examples/BufferArena/buffers.wasm` is the matching precompiled wasm32 module; `buffers-fallback.js` provides the same public C-level ABI in JavaScript.
 - `Tests/test_buffers_node.js` and `Tests/test_buffers_native.c`: developer-host regression tests; the XP runner also attempts independent native buffer tests and an end-to-end native benchmark.
+
+Typed copy access supports u8/u8c/i8/u16/i16/u32/i32/f32/f64 without handing callers a view into mutable Wasm memory. Native Release builds link the XP-compatible CRT statically to reduce external DLL dependencies; the native DLL itself must still be deployed.
 
 The current allocator is a deliberately **bounded prototype**, not a drop-in libc malloc: at most 128 tracked blocks, 32 MiB Wasm linear-memory budget (16 MiB maximum single JS buffer), first-fit free-block reuse without coalescing or shrinking, and synchronous access. Never retain views into Wasm memory across growth or reuse a released handle. Browser benchmarks measure allocation, memory copies, and processing; the XP-native CLI benchmark is reported separately and is not an apples-to-apples browser speed ranking.
 

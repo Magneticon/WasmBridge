@@ -97,7 +97,11 @@ namespace WasmBridge
             // Quote path-like arguments for the Windows CRT argv convention.
             if (s == null || s.IndexOf('\0') >= 0 || s.IndexOf('"') >= 0)
                 throw new ArgumentException("Invalid command-line path.");
-            return "\"" + s.Replace("\\", "\\\\") + "\"";
+            // For CRT parsing, only backslashes immediately before the closing quote
+            // need doubling; ordinary backslashes in Windows paths must be preserved.
+            int trailing = 0;
+            for (int i = s.Length - 1; i >= 0 && s[i] == '\\'; --i) ++trailing;
+            return "\"" + s + new string('\\', trailing) + "\"";
         }
     }
 }

@@ -11,6 +11,7 @@ namespace WasmBridge
         public string WasmFile;
         public string FallbackFile;
         public string RuntimeFile;
+        public string AdapterFile; // Optional browser-side adapter (e.g., Runtime/buffers.js)
         public string OutputDirectory;
         public string ExportName = "add";
     }
@@ -38,6 +39,8 @@ namespace WasmBridge
                 throw new FileNotFoundException("FallbackFile is required.", options.FallbackFile);
             if (String.IsNullOrEmpty(options.RuntimeFile) || !File.Exists(options.RuntimeFile))
                 throw new FileNotFoundException("RuntimeFile is required.", options.RuntimeFile);
+            if (!String.IsNullOrEmpty(options.AdapterFile) && !File.Exists(options.AdapterFile))
+                throw new FileNotFoundException("AdapterFile not found.", options.AdapterFile);
             if (String.IsNullOrEmpty(options.OutputDirectory)) throw new ArgumentException("OutputDirectory is required.");
             if (String.IsNullOrEmpty(options.ExportName)) throw new ArgumentException("ExportName is required.");
 
@@ -50,6 +53,12 @@ namespace WasmBridge
             CopyIfDifferent(options.WasmFile, wasm);
             CopyIfDifferent(options.FallbackFile, fallback);
             CopyIfDifferent(options.RuntimeFile, runtime);
+            string adapter = null;
+            if (!String.IsNullOrEmpty(options.AdapterFile))
+            {
+                adapter = Path.Combine(destination, "adapter.js");
+                CopyIfDifferent(options.AdapterFile, adapter);
+            }
 
             // Informational metadata. No claim that a particular module is actually MVP-only.
             var manifest = new Dictionary<string, object>();
@@ -57,10 +66,12 @@ namespace WasmBridge
             manifest["wasm"] = "module.wasm";
             manifest["fallback"] = "fallback.js";
             manifest["runtime"] = "wasmbridge.js";
+            if (adapter != null) manifest["adapter"] = "adapter.js";
             manifest["exports"] = options.ExportName.Split(',');
             manifest["wasmSha256"] = Sha256(wasm);
             manifest["fallbackSha256"] = Sha256(fallback);
             manifest["runtimeSha256"] = Sha256(runtime);
+            if (adapter != null) manifest["adapterSha256"] = Sha256(adapter);
             manifest["compatibility"] = "Browser-side instantiation and export checks required; test on target Firefox 52.";
             string path = Path.Combine(destination, "manifest.json");
             File.WriteAllText(path, new JavaScriptSerializer().Serialize(manifest));

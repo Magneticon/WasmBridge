@@ -66,6 +66,7 @@ namespace WasmBridge.CLI
                         {
                             Console.WriteLine("PASS: valid and invalid headers handled.");
                             NativeImageSelfTest();
+                            NativeBuffersSelfTest();
                             return 0;
                         }
                         throw new Exception("Invalid magic accepted.");
@@ -115,6 +116,94 @@ namespace WasmBridge.CLI
             Console.WriteLine("PASS: native RGBA8 inversion, alpha and bounds handled.");
         }
 
+
+        [DllImport("WasmBridge.Native.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr wb_alloc(int bytes);
+
+        [DllImport("WasmBridge.Native.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int wb_free(IntPtr pointer);
+
+        [DllImport("WasmBridge.Native.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int wb_capacity(IntPtr pointer);
+
+        [DllImport("WasmBridge.Native.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int wb_invert_rgba(IntPtr source, IntPtr destination, int bytes);
+
+        [DllImport("WasmBridge.Native.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int wb_active_count();
+
+        private static void NativeBuffersSelfTest()
+        {
+            IntPtr source = IntPtr.Zero;
+            IntPtr destination = IntPtr.Zero;
+            try
+            {
+                source = wb_alloc(8);
+                destination = wb_alloc(8);
+                if (source == IntPtr.Zero || destination == IntPtr.Zero || source == destination ||
+                    wb_capacity(source) < 8 || wb_capacity(destination) < 8 ||
+                    wb_active_count() != 2)
+                    throw new InvalidOperationException("Native allocator returned invalid independent buffers.");
+
+                byte[] input = { 1, 2, 3, 4, 200, 100, 0, 128 };
+                byte[] expected = { 254, 253, 252, 4, 55, 155, 255, 128 };
+                byte[] actual = new byte[8];
+                Marshal.Copy(input, 0, source, input.Length);
+                if (wb_invert_rgba(source, destination, input.Length) != input.Length ||
+                    wb_invert_rgba(source, destination, 7) != -1)
+                    throw new InvalidOperationException("Native allocator RGB processing rejected valid input or accepted invalid size.");
+                Marshal.Copy(destination, actual, 0, actual.Length);
+                for (int i = 0; i < actual.Length; i++)
+                    if (actual[i] != expected[i])
+                        throw new InvalidOperationException("Native allocator RGB/alpha mismatch at byte " + i);
+            }
+            finally
+            {
+                if (destination != IntPtr.Zero && wb_free(destination) != 1)
+                    throw new InvalidOperationException("Native allocator failed to release destination.");
+                if (source != IntPtr.Zero && wb_free(source) != 1)
+                    throw new InvalidOperationException("Native allocator failed to release source.");
+            }
+            if (wb_active_count() != 0)
+                throw new InvalidOperationException("Native allocator leaked live buffers.");
+            if (wb_free(source) != 0 || wb_capacity(source) != 0)
+                throw new InvalidOperationException("Native allocator allowed a stale pointer.");
+            Console.WriteLine("PASS: XP native independent buffers, RGBA output, release and bounds.");
+
+            const int side = 512;
+            const int size = side * side * 4;
+            byte[] testPixels = new byte[size];
+            byte[] outputPixels = new byte[size];
+            for (int i = 0; i < size; i++) testPixels[i] = (byte)(i * 17);
+            System.Diagnostics.Stopwatch timer = System.Diagnostics.Stopwatch.StartNew();
+            for (int iteration = 0; iteration < 3; iteration++)
+            {
+                IntPtr inputPointer = IntPtr.Zero;
+                IntPtr outputPointer = IntPtr.Zero;
+                try
+                {
+                    inputPointer = wb_alloc(size);
+                    outputPointer = wb_alloc(size);
+                    if (inputPointer == IntPtr.Zero || outputPointer == IntPtr.Zero)
+                        throw new OutOfMemoryException("Native buffer benchmark allocation failed.");
+                    Marshal.Copy(testPixels, 0, inputPointer, size);
+                    if (wb_invert_rgba(inputPointer, outputPointer, size) != size)
+                        throw new InvalidOperationException("Native buffer benchmark failed.");
+                    Marshal.Copy(outputPointer, outputPixels, 0, size);
+                }
+                finally
+                {
+                    if (outputPointer != IntPtr.Zero) wb_free(outputPointer);
+                    if (inputPointer != IntPtr.Zero) wb_free(inputPointer);
+                }
+                if (outputPixels[0] != 255 || outputPixels[3] != testPixels[3])
+                    throw new InvalidOperationException("Native benchmark output mismatch.");
+            }
+            timer.Stop();
+            Console.WriteLine("Native XP RGBA benchmark (512x512, mean 3 runs, alloc + Marshal.Copy in/out + invert): " +
+                              (timer.Elapsed.TotalMilliseconds / 3.0).ToString("F2") + " ms");
+        }
+
         private static Dictionary<string, string> Parse(string[] args)
         {
             Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -144,7 +233,7 @@ namespace WasmBridge.CLI
             Console.WriteLine("  build --source Core\\image.c --out rgba.wasm --export wb_rgba_buffer,wb_rgba_capacity,wb_rgba_invert");
             Console.WriteLine("  package --wasm add.wasm --fallback Examples\\HelloWorld\\add.js --runtime Runtime\\wasmbridge.js --out dist [--export add]");
             Console.WriteLine("  verify --wasm add.wasm     (header only)");
-            Console.WriteLine("  self-test                   (managed header and native RGBA8 tests)");
+            Console.WriteLine("  self-test                   (managed header, native RGBA8 and buffer-manager tests)");
             Console.WriteLine("For multiple exports, provide comma-separated names with no spaces.");
             Console.WriteLine("External WASM-targeting LLVM/Clang is required to compile; actual browser testing is separate.");
         }

@@ -109,7 +109,9 @@
         }
         function writeTyped(handle, type, values) {
             var record = resolve(handle), Constructor = arrayType(type);
-            if (!(values instanceof Constructor))
+            // Typed arrays from a separate window/realm are valid input too.
+            if (!values || Object.prototype.toString.call(values) !==
+                Object.prototype.toString.call(new Constructor(0)))
                 throw new TypeError("Typed input does not match requested element type: " + type);
             var count = values.length, bytes = count * Constructor.BYTES_PER_ELEMENT;
             if (bytes > record.length) throw new RangeError("Typed data exceeds buffer length.");

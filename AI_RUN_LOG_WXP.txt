@@ -1,0 +1,7 @@
+DBGRun architecture: x64
+Target architecture: x64 (PE machine 0x8664)
+Target type: managed CLR
+DBGRun mode: managed CLR under native debugger; stdout/stderr capture enabled
+PASS: valid and invalid headers handled.
+
+DBGRun result: EXIT  code=0 (0x00000000)

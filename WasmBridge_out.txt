@@ -4,40 +4,14 @@ DBGRun architecture: x64
 Target architecture: x64 (PE machine 0x8664)
 Target type: managed CLR
 DBGRun mode: managed CLR under native debugger; stdout/stderr capture enabled
+PASS: valid and invalid headers handled.
 
-Unhandled Exception: System.TypeLoadException: Could not load type 'WasmBridge.CompileOptions' from assembly 'WasmBridge, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null'.
-   at WasmBridge.CLI.Program.Main(String[] args)
-
-=== DBGRun: UNHANDLED EXCEPTION ===
-Exception:     0xE0434352 (CLR_EXCEPTION)
-Address:       0x77D4DCE0
-Process ID:    5468
-Thread ID:     7692
-Module base:   0x77D40000 + 0xDCE0
-
-Call stack:
-  #00  0x77D4DCE0  module@0x77D40000+0xDCE0
-===================================
-
-DBGRun result: CRASH  exception=0xE0434352  exit=0x00000080
-DBGRun exit code: 128 
+DBGRun result: EXIT  code=0 (0x00000000)
+DBGRun exit code: 0 
 DBGRun architecture: x64
 Target architecture: x64 (PE machine 0x8664)
 Target type: managed CLR
 DBGRun mode: managed CLR under native debugger; stdout/stderr capture enabled
+PASS: valid and invalid headers handled.
 
-Unhandled Exception: System.TypeLoadException: Could not load type 'WasmBridge.CompileOptions' from assembly 'WasmBridge, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null'.
-   at WasmBridge.CLI.Program.Main(String[] args)
-
-=== DBGRun: UNHANDLED EXCEPTION ===
-Exception:     0xE0434352 (CLR_EXCEPTION)
-Address:       0x77D4DCE0
-Process ID:    5468
-Thread ID:     7692
-Module base:   0x77D40000 + 0xDCE0
-
-Call stack:
-  #00  0x77D4DCE0  module@0x77D40000+0xDCE0
-===================================
-
-DBGRun result: CRASH  exception=0xE0434352  exit=0x00000080
+DBGRun result: EXIT  code=0 (0x00000000)

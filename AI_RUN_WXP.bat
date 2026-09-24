@@ -38,10 +38,12 @@ findstr /C:"PASS: valid and invalid headers handled." "%OUT%" >nul 2>&1
 if errorlevel 1 set "RC=1"
 findstr /C:"PASS: native RGBA8 inversion, alpha and bounds handled." "%OUT%" >nul 2>&1
 if errorlevel 1 set "RC=1"
+findstr /C:"PASS: XP native independent buffers, RGBA output, release and bounds." "%OUT%" >nul 2>&1
+if errorlevel 1 set "RC=1"
 
 if not "%RC%"=="0" (
     echo RUN FAILED: self-test result was not verified. >>"%OUT%"
 ) else (
-    echo RUN PASS: managed header parser and native RGBA8 self-test. >>"%OUT%"
+    echo RUN PASS: managed header parser, native RGBA8 and native buffer-manager tests. >>"%OUT%"
 )
 endlocal & exit /b %RC%

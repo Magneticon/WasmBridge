@@ -73,3 +73,56 @@ On a development machine with a Wasm-capable external Clang and wasm-ld, the CLI
     bin\Release\WXP\x64\WasmBridge.exe build --source Core\image.c --out Examples\ImageProcessing\rgba.wasm --export wb_rgba_buffer,wb_rgba_capacity,wb_rgba_invert
 
 The CLI's XP-targeted managed binary may be run on the Windows 10 *build host* if the matching .NET Framework is installed; there is no separate W10 product build. The native Windows toolset `v141_xp` cannot compile wasm32. Do not require an XP-hosted LLVM toolchain just to exercise Wasm in Firefox on XP.
+
+## v0.3 independent-buffer and memory-growth prototype
+
+The previous 256×160 RGBA test was verified in the user's actual Firefox 52 on XP, with the Wasm backend, forced JS fallback, reference agreement, and unchanged input. The new **dynamic** buffer test is at `Examples/BufferArena/index.html` and has **not** yet been tested in that browser.
+
+### Native and WebAssembly ABI
+
+`Core/buffers.c` and `Core/buffers.h` compile into the XP-native DLL using `v141_xp` and into `Examples/BufferArena/buffers.wasm` using external freestanding wasm32 Clang. The five exported C functions are:
+
+- `wb_alloc(bytes:int32) -> pointer`: reserve an independently owned buffer; returns null/offset 0 on failure.
+- `wb_capacity(pointer) -> int32`: actual live block capacity, or 0 for an invalid/released pointer.
+- `wb_free(pointer) -> int32`: release a live allocation (1 successful, 0 invalid/already released).
+- `wb_invert_rgba(src:pointer, dst:pointer, bytes:int32) -> int32`: invert RGB, preserve alpha; returns byte count or -1 on bounds/size errors. Exact in-place aliasing is supported.
+- `wb_active_count() -> int32`: currently live blocks.
+
+Pointers from Wasm are **32-bit byte offsets into the module's exported linear memory**. Pointers from the XP DLL are **native process addresses** and use `IntPtr` in C# P/Invoke. Do not pass pointer values between different backends or DLLs.
+
+The Wasm module uses an eight-byte-aligned bump allocator starting at linker-provided `__heap_base`, a bounded 128-entry metadata table, and first-fit freed-block reuse. If there is insufficient linear memory, the *JavaScript adapter* grows `exports.memory` by 64 KiB pages and retries; C functions never silently access beyond available memory. The native DLL uses CRT `malloc/free`, tracked through the same slot table. The JS fallback implements the equivalent API with a growable `ArrayBuffer`.
+
+**Limits:** 32 MiB linear-memory budget in the adapter/allocator, 16 MiB maximum individual JS allocation, 128 tracked allocations, at most 2048 pixels per RGBA dimension. Freed Wasm blocks can be reused, but the first version does not coalesce fragments or shrink linear memory. Heavy allocation churn with many different sizes can exhaust the slot table or address space even if many blocks were freed. The raw C ABI cannot reliably detect every stale pointer after address reuse; the JS adapter enforces handle identity and rejects use-after-release.
+
+### Browser API and lifetime
+
+Include `Runtime/wasmbridge.js` followed by `Runtime/buffers.js`. Call `WasmBridgeBuffers.load({wasm:"buffers.wasm",fallback:"buffers-fallback.js"})`; the loader validates the functions and tests the memory ABI before selecting Wasm. An unsupported/broken Wasm module selects the matching JS implementation instead. From the loaded manager:
+
+    var src = manager.allocate(pixelBytes);
+    var dst = manager.allocate(pixelBytes);
+    try {
+        manager.write(src, imageData.data);
+        manager.invertRGBA(src, dst, width, height);
+        var pixels = manager.read(dst); // independent Uint8Array copy
+    } finally {
+        manager.release(dst);
+        manager.release(src);
+    }
+
+For the common case, `manager.processRGBA(imageData.data, width, height)` handles both allocations, processing, copying and release automatically, returning an independent `Uint8ClampedArray`. `manager.statistics()` exposes currently allocated block count and linear-memory size. The JS adapter reacquires a typed-array view **after each potential memory growth**, never returns a borrowed view, checks byte lengths, and rejects released or foreign buffer handles. All calls are synchronous; no shared-memory threading is implied.
+
+### Manual XP Firefox acceptance test
+
+Open `Examples/BufferArena/index.html` on the XP machine in Firefox 52 from the unchanged repository tree (the earlier demos worked from `file://` on this installation). The page tests two *simultaneously live* allocations, verifies previously written bytes remain correct after a potential memory growth, frees both, rejects a stale handle, and runs the RGBA sample.
+
+With **Force JavaScript fallback** unchecked, expect `Selected backend: wasm`, `Reference byte parity: PASS`, and `Wasm / JS byte parity: PASS`. Switch to forced JS and expect `Selected backend: javascript` with unchanged output. Try 64, 256, 512 and 1024 pixel sizes and record the backend, before/after memory size, diagnostics and any FAIL errors. The first large-image test should require the exported memory to grow; subsequent tests may reuse already expanded memory. The page distinguishes a JS-vs-JS comparison from actual cross-backend parity if WebAssembly is unavailable.
+
+The page also reports a short (3-iteration) end-to-end mean for each backend, including *allocation + copies + processing* and separately labels module startup/validation. These measurements are illustrative, vary with browser JIT, warm-up, image size and clock resolution, and do not by themselves establish a general Wasm advantage. The XP native CLI self-test reports a **separate** 512×512 mean using `Marshal.Copy` input/output and native allocation; native and browser times involve different workloads/harnesses and must not be treated as directly interchangeable.
+
+For an optional development-host regression, `Tests/test_buffers_node.js` checks Wasm/JS agreement across six image sizes, independent live allocations, memory growth, stale/foreign handles, bounds, and invalid-Wasm fallback. `Tests/test_buffers_native.c` checks the portable C allocator separately. These do not replace the user's actual XP browser results.
+
+### XP native DLL deployment
+
+The latest repository XP run log available before v0.3 shows **build success but a runtime error**: `Unable to load DLL 'WasmBridge.Native.dll' (0x8007007E)`. That error can indicate that the DLL itself, or a dependent runtime DLL, is missing from the XP environment. The native-library loading and end-to-end XP test have **not** yet been verified for this cycle. The DLL must be built with the matching x64 `v141_xp` configuration and deployed alongside `WasmBridge.exe` and `WasmBridge.Core.dll` in the XP `bin\Release\WXP\x64\` application directory; all of its XP-compatible CRT dependencies must also be present. The repository's XP runner now checks for the presence of the native DLL and requires all three native/managed PASS markers instead of silently treating a managed-only success as complete.
+
+No separate W10 binaries/runners and no project-local build CMD scripts are introduced. The existing external AIEXE workflow remains the build orchestrator.

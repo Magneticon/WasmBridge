@@ -12,34 +12,29 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup>
-    <AtaTargetOS Condition="'$(AtaTargetOS)' == ''">WXP</AtaTargetOS>
     <BuildArch Condition="'$(Platform)' == 'Win32'">x86</BuildArch>
     <BuildArch Condition="'$(Platform)' == 'x64'">x64</BuildArch>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType><UseDebugLibraries>true</UseDebugLibraries><CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset Condition="'$(AtaTargetOS)'=='WXP'">v141_xp</PlatformToolset>
-    <PlatformToolset Condition="'$(AtaTargetOS)'=='W10'">v143</PlatformToolset>
+    <PlatformToolset>v141_xp</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType><UseDebugLibraries>true</UseDebugLibraries><CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset Condition="'$(AtaTargetOS)'=='WXP'">v141_xp</PlatformToolset>
-    <PlatformToolset Condition="'$(AtaTargetOS)'=='W10'">v143</PlatformToolset>
+    <PlatformToolset>v141_xp</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType><UseDebugLibraries>false</UseDebugLibraries><CharacterSet>Unicode</CharacterSet><WholeProgramOptimization>true</WholeProgramOptimization>
-    <PlatformToolset Condition="'$(AtaTargetOS)'=='WXP'">v141_xp</PlatformToolset>
-    <PlatformToolset Condition="'$(AtaTargetOS)'=='W10'">v143</PlatformToolset>
+    <PlatformToolset>v141_xp</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType><UseDebugLibraries>false</UseDebugLibraries><CharacterSet>Unicode</CharacterSet><WholeProgramOptimization>true</WholeProgramOptimization>
-    <PlatformToolset Condition="'$(AtaTargetOS)'=='WXP'">v141_xp</PlatformToolset>
-    <PlatformToolset Condition="'$(AtaTargetOS)'=='W10'">v143</PlatformToolset>
+    <PlatformToolset>v141_xp</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
-    <OutDir>$(SolutionDir)bin\$(Configuration)\$(AtaTargetOS)\$(BuildArch)\</OutDir>
-    <IntDir>$(ProjectDir)obj\$(Configuration)\$(AtaTargetOS)\$(Platform)\</IntDir>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\WXP\$(BuildArch)\</OutDir>
+    <IntDir>$(ProjectDir)obj\$(Configuration)\WXP\$(Platform)\</IntDir>
     <TargetName>WasmBridge.Native</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup>

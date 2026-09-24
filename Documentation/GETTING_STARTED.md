@@ -57,4 +57,4 @@ The loader tries fetch + `WebAssembly.instantiate(new Uint8Array(bytes), imports
 
 `self-test` exercises managed header parsing. `verify` checks **only** the eight-byte Wasm magic/version header; it does not prove that the module is safe, import-free, MVP-only or compatible with Firefox 52. Actual XP runtime and browser testing remain manual until an appropriate test harness exists.
 
-Do not modify the operator's external AIEXE build orchestration. No placeholder `AI_RUN_WXP.bat` or `AI_RUN_W10.bat` is included, because a managed self-test alone cannot establish the required Firefox browser behavior.
+Do not modify the operator's external AIEXE build orchestration. The repository's existing `AI_RUN_WXP.bat` has been adapted to run the managed CLI `self-test` under the operator's DBGRun convention, verify its PASS marker, and return a nonzero exit status if verification fails. This test does **not** exercise the browser or native WASM. There is no W10 runner yet; the browser smoke test above remains manual on XP.

@@ -136,10 +136,13 @@ byte-for-byte RGBA parity. The buffer manager is reusable; color inversion is on
                 if (mine !== serial) return;
                 paint(sourceCanvas, input, width);
                 paint(outputCanvas, result.output, width);
+                var crossBackend = selected.backend !== comparison.backend;
                 report.textContent =
                     "PASS: " + width + " x " + width + " (" + input.length + " RGBA bytes)" +
                     "\nSelected backend: " + selected.backend +
-                    "\nWasm / JS / reference byte parity: PASS" +
+                    "\nReference byte parity: PASS" +
+                    "\n" + (crossBackend ? "Wasm / JS byte parity: PASS" :
+                        "Comparison backend: " + comparison.backend + " (Wasm unavailable; cross-backend parity not tested)") +
                     "\nIndependent live buffers, retained bytes, released-handle rejection: PASS" +
                     "\nLinear memory before/after buffer test: " +
                     probe.before + " / " + probe.after + " bytes" +

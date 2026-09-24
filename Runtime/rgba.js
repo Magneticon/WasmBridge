@@ -41,8 +41,13 @@
             exports: NAMES,
             validateWasm: function (exportsObject) {
                 checkMemory(exportsObject);
-                if (exportsObject.wb_rgba_capacity() < MAX_BYTES) {
-                    throw new Error("RGBA module buffer capacity is too small.");
+                var capacity = exportsObject.wb_rgba_capacity();
+                var offset = exportsObject.wb_rgba_buffer();
+                var size = exportsObject.memory.buffer.byteLength;
+                if (capacity < MAX_BYTES || capacity > size ||
+                    offset < 0 || offset !== Math.floor(offset) ||
+                    offset + capacity > size) {
+                    throw new Error("RGBA module exposes invalid linear-memory bounds.");
                 }
             }
         }).then(function (processor) {

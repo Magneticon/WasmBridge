@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WasmBridge - Firefox 52 export execution smoke test</title>
+<style>
+body { font-family: sans-serif; max-width: 760px; margin: 2em auto; padding: 0 1em; }
+pre { border: 1px solid #aaa; padding: 1em; white-space: pre-wrap; }
+</style>
+<script src="../../Runtime/wasmbridge.js"></script>
+</head>
+<body>
+<h1>WasmBridge: exported add() smoke test</h1>
+<p>Serve this repository via HTTP; file:// may block fetching the .wasm file.</p>
+<label><input type="checkbox" id="force-js"> Force JavaScript fallback</label>
+<button type="button" id="run">Run test</button>
+<pre id="results">Press Run test.</pre>
+<script>
+(function () {
+    "use strict";
+    var results = document.getElementById("results");
+    function run() {
+        results.textContent = "Loading...";
+        WasmBridge.load({
+            wasm: "add.wasm",
+            fallback: "add.js",
+            fallbackGlobal: "WasmBridgeFallback",
+            exports: ["add"],
+            preferWasm: !document.getElementById("force-js").checked
+        }).then(function (processor) {
+            var answer = processor.add(20, 22);
+            var pass = answer === 42;
+            results.textContent =
+                (pass ? "PASS" : "FAIL") + ": add(20,22) = " + answer +
+                "\nBackend: " + processor.backend +
+                "\nDiagnostics: " + (processor.diagnostic || "(none)") +
+                "\nBrowser: " + navigator.userAgent;
+        }).catch(function (error) {
+            results.textContent = "FAIL: " + error.message;
+        });
+    }
+    document.getElementById("run").onclick = run;
+    run();
+}());
+</script>
+</body>
+</html>

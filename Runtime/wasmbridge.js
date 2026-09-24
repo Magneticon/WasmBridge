@@ -87,6 +87,11 @@
         }).then(function (result) {
             var instance = result.instance || result;
             checkExports(instance.exports, names);
+            // Allow adapters to reject an unusable WASM ABI before backend selection.
+            // A failed check falls through to the caller's matching JS fallback.
+            if (typeof options.validateWasm === "function") {
+                options.validateWasm(instance.exports, instance);
+            }
             return publicAdapter("wasm", instance.exports, names, "", instance);
         });
     }

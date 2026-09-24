@@ -4,6 +4,18 @@
     "use strict";
     var PAGE = 65536, LIMIT = 32 * 1024 * 1024, MAX_BUFFER = 16 * 1024 * 1024;
     var EXPORTS = ["wb_alloc", "wb_free", "wb_capacity", "wb_invert_rgba", "wb_active_count"];
+    var TYPES = {
+        u8: Uint8Array, u8c: Uint8ClampedArray, i8: Int8Array,
+        u16: Uint16Array, i16: Int16Array,
+        u32: Uint32Array, i32: Int32Array,
+        f32: Float32Array, f64: Float64Array
+    };
+    function arrayType(name) {
+        if (!Object.prototype.hasOwnProperty.call(TYPES, name))
+            throw new TypeError("Unsupported buffer element type: " + name);
+        return TYPES[name];
+    }
+
 
     function validLength(bytes) {
         if (typeof bytes !== "number" || bytes !== Math.floor(bytes) ||
@@ -95,6 +107,25 @@
             result.set(view(record, bytes));
             return result;
         }
+        function writeTyped(handle, type, values) {
+            var record = resolve(handle), Constructor = arrayType(type);
+            if (!(values instanceof Constructor))
+                throw new TypeError("Typed input does not match requested element type: " + type);
+            var count = values.length, bytes = count * Constructor.BYTES_PER_ELEMENT;
+            if (bytes > record.length) throw new RangeError("Typed data exceeds buffer length.");
+            new Constructor(memory.buffer, record.offset, count).set(values);
+        }
+        function readTyped(handle, type, count) {
+            var record = resolve(handle), Constructor = arrayType(type);
+            if (typeof count === "undefined")
+                count = Math.floor(record.length / Constructor.BYTES_PER_ELEMENT);
+            if (typeof count !== "number" || count !== Math.floor(count) || count < 0 ||
+                count * Constructor.BYTES_PER_ELEMENT > record.length)
+                throw new RangeError("Typed read lies outside buffer bounds.");
+            var result = new Constructor(count);
+            result.set(new Constructor(memory.buffer, record.offset, count));
+            return result;
+        }
         function invertRGBA(source, destination, width, height) {
             var input = resolve(source), output = resolve(destination);
             if (typeof width !== "number" || typeof height !== "number" ||
@@ -130,6 +161,7 @@
         return {
             backend: processor.backend, diagnostic: processor.diagnostic,
             allocate: allocate, release: release, write: write, read: read,
+            writeTyped: writeTyped, readTyped: readTyped,
             invertRGBA: invertRGBA, processRGBA: processRGBA,
             statistics: function () {
                 return {bytesInLinearMemory: memory.buffer.byteLength,

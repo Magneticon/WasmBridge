@@ -13,7 +13,7 @@ See `Documentation/GETTING_STARTED.md` for build and smoke-test instructions. Th
 - `Runtime/wasmbridge.js`: browser feature-detection, load, export validation and fallback.
 - `Examples/HelloWorld/`: test harness and fallback implementation.
 - `Tests/`: browser and managed tests.
-- `build_x86.cmd`, `build_x64.cmd`: Windows build scripts.
+- Windows builds use the operator's existing external AIEXE/MSBuild workflow; there are no repository-local build scripts.
 
 The name **MIRAE** is reserved for the separate browser desktop project. WasmBridge is independent of MIRAE and ATALANTA WebUI.
 

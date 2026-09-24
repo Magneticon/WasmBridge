@@ -13,6 +13,7 @@ set "OUT=%ROOT%%OUTFILE%"
 set "ARCH=x64"
 set "DBG=G:\CODEX\GIT\CONTROL\DBGRun\%ARCH%\DBGRun.exe"
 set "EXE=%ROOT%bin\Release\WXP\%ARCH%\%PROGNAME%.exe"
+set "NATIVE=%ROOT%bin\Release\WXP\%ARCH%\WasmBridge.Native.dll"
 set "DBGOUT=%ROOT%AI_RUN_LOG_WXP.txt"
 
 echo WasmBridge managed CLI self-test on WXP %ARCH% >"%OUT%"
@@ -23,6 +24,12 @@ if not exist "%EXE%" (
     echo RUN FAILED: executable not found. >>"%OUT%"
     endlocal & exit /b 1
 )
+if not exist "%NATIVE%" (
+    echo RUN FAILED: required XP native DLL not found beside WasmBridge.exe: "%NATIVE%" >>"%OUT%"
+    echo Verify that the v141_xp x64 native project is built and deployed with the managed binaries. >>"%OUT%"
+    endlocal & exit /b 1
+)
+
 if not exist "%DBG%" (
     echo RUN FAILED: DBGRun not found. >>"%OUT%"
     endlocal & exit /b 1

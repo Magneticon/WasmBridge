@@ -14,8 +14,8 @@ bin/
 *.lib
 *.dll
 *.exe
-AI_BUILD_LOG_*.txt
-AI_RUN_LOG_*.txt
+AI_BUILD_LOG_W10.txt
+AI_RUN_LOG_W10.txt
 DBGOUT*
 # Keep the small intentionally checked-in wasm32 smoke-test fixture
 !Examples/HelloWorld/add.wasm

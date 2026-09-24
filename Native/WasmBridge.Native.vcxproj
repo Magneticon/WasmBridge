@@ -44,7 +44,7 @@
     </ClCompile>
     <Link><SubSystem>Windows</SubSystem><GenerateDebugInformation>true</GenerateDebugInformation></Link>
   </ItemDefinitionGroup>
-  <ItemGroup><ClCompile Include="..\Core\math.c" /></ItemGroup>
-  <ItemGroup><ClInclude Include="..\Core\math.h" /></ItemGroup>
+  <ItemGroup><ClCompile Include="..\Core\math.c" /><ClCompile Include="..\Core\image.c" /></ItemGroup>
+  <ItemGroup><ClInclude Include="..\Core\math.h" /><ClInclude Include="..\Core\image.h" /></ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

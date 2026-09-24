@@ -1,0 +1,21 @@
+# The local build outputs and operators' machine-specific diagnostics
+.vs/
+bin/
+**/obj/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+*.tlog
+*.lastbuildstate
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+AI_BUILD_LOG_*.txt
+AI_RUN_LOG_*.txt
+DBGOUT*
+# Keep the small intentionally checked-in wasm32 smoke-test fixture
+!Examples/HelloWorld/add.wasm

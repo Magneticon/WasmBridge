@@ -12,14 +12,7 @@
 
 ## Build the VS2022 solution
 
-On a Windows 10 machine with Visual Studio 2022, install the C++ workload, v141_xp toolset, Windows XP build support and .NET Framework 4.0 targeting pack/reference assemblies. In a **VS2022 Developer Command Prompt**, run:
-
-    build_x86.cmd WXP
-    build_x64.cmd WXP
-    build_x86.cmd W10
-    build_x64.cmd W10
-
-Or open `WasmBridge.sln` in VS2022 and build Release/x86 or Release/x64; set `AtaTargetOS=WXP` (the default) or `W10` for a different target. All final artifacts are staged together in `bin\Release\WXP\x86\`, `bin\Release\WXP\x64\`, etc. Managed and native intermediate directories stay separate for OS, architecture and configuration.
+On the Windows 10 build host, use the existing external AIEXE/MSBuild workflow to build `WasmBridge.sln`; this repository does not provide or require standalone build CMD scripts. The existing workflow selects Release/x86 or Release/x64 and passes `AtaTargetOS=WXP` (native `v141_xp`) or `AtaTargetOS=W10` (native `v143`). Alternatively, open `WasmBridge.sln` in VS2022 and select the intended solution configuration and OS property. Install the C++ workload, v141_xp toolset, Windows XP build support and .NET Framework 4.0 targeting/reference assemblies. All final artifacts are staged together in `bin\Release\WXP\x86\`, `bin\Release\WXP\x64\`, etc. Managed and native intermediate directories stay separate for OS, architecture and configuration.
 
 The native DLL can only be loaded by a process of matching bitness. The managed CLI does not need the native DLL for its build/package commands.
 

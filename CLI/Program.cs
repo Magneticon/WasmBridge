@@ -101,9 +101,11 @@ namespace WasmBridge.CLI
         {
             Console.WriteLine("WasmBridge 0.1 - XP/.NET 4.0 compatible build/packaging frontend");
             Console.WriteLine("  build --source Core\\math.c --out add.wasm [--clang path] [--export add]");
+            Console.WriteLine("  build --source Core\\image.c --out rgba.wasm --export wb_rgba_buffer,wb_rgba_capacity,wb_rgba_invert");
             Console.WriteLine("  package --wasm add.wasm --fallback Examples\\HelloWorld\\add.js --runtime Runtime\\wasmbridge.js --out dist [--export add]");
             Console.WriteLine("  verify --wasm add.wasm     (header only)");
             Console.WriteLine("  self-test                   (managed header parser only)");
+            Console.WriteLine("For multiple exports, provide comma-separated names with no spaces.");
             Console.WriteLine("External WASM-targeting LLVM/Clang is required to compile; actual browser testing is separate.");
         }
     }

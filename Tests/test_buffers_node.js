@@ -55,6 +55,12 @@ function bytesEqual(a,b) { assert.deepStrictEqual(Array.from(a), Array.from(b));
     assert.throws(()=>native.write(a,new Uint8Array(800000)),RangeError);
     native.release(a);native.release(c);native.release(d);native.release(reused);
     assert.strictEqual(native.statistics().activeBlocks,0);
+    let typed=native.allocate(64);
+    native.writeTyped(typed,"f64",new Float64Array([1.25,-19.5,0.125]));
+    bytesEqual(new Uint8Array(native.readTyped(typed,"f64",3).buffer),
+               new Uint8Array(new Float64Array([1.25,-19.5,0.125]).buffer));
+    assert.throws(()=>native.readTyped(typed,"f64",9),RangeError);
+    native.release(typed);
     let jsA=fallback.allocate(8);
     assert.throws(()=>native.read(jsA),/Unknown/);
     fallback.release(jsA);

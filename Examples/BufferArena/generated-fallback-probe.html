@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WasmBridge — experimental wasm2js fallback compatibility probe</title>
+<style>
+body { font: 14px Arial,sans-serif; margin: 22px auto; max-width: 850px; padding: 0 14px; }
+pre { padding: 12px; border: 1px solid #999; white-space: pre-wrap; }
+</style>
+<script src="../../Runtime/legacy-compat.js"></script>
+<script src="../../Runtime/wasmbridge.js"></script>
+<script src="../../Runtime/buffers.js"></script>
+<script src="buffers-fallback.js"></script>
+<!-- This optional file must first be generated on the build host.
+     It is deliberately NOT the default fallback for existing examples. -->
+<script src="buffers-generated-candidate.js"></script>
+</head>
+<body>
+<h1>Experimental generated-fallback probe</h1>
+<p>Generate <code>buffers-generated-candidate.js</code> with the CLI on the build
+host, then reload this page in Firefox 52.9 ESR. Until the candidate passes,
+the production BufferArena example continues using its proven handwritten JS fallback.</p>
+<pre id="result">Waiting...</pre>
+<script>
+(function () {
+    "use strict";
+    var result = document.getElementById("result");
+    var features = WasmBridgeCompat.detect();
+    var head = "Browser: " + navigator.userAgent +
+               "\nPromise: " + features.promise + ", fetch: " + features.fetch +
+               ", XMLHttpRequest: " + features.xhr + ", WebAssembly: " + features.wasm;
+    var candidate = window.WasmBridgeGeneratedCandidate;
+    if (!candidate) {
+        result.textContent = head + "\nPENDING: generated candidate not loaded. " +
+            "Create buffers-generated-candidate.js with the host toolchain first.";
+        return;
+    }
+    function equal(a, b) {
+        if (a.length !== b.length) return false;
+        for (var i = 0; i < a.length; ++i) if (a[i] !== b[i]) return false;
+        return true;
+    }
+    // Intentionally force both branches into JavaScript. This tests the
+    // candidate's real allocator/memory ABI, rather than silently using Wasm.
+    WasmBridgeBuffers.load({
+        wasm: "buffers.wasm",
+        fallback: candidate,
+        preferWasm: false
+    }).then(function (generated) {
+        return WasmBridgeBuffers.load({
+            wasm: "buffers.wasm",
+            fallback: window.WasmBridgeBuffersFallback,
+            preferWasm: false
+        }).then(function (reference) {
+            var sizes = [1, 16, 256, 512], notes = [];
+            for (var j = 0; j < sizes.length; ++j) {
+                var n = sizes[j], input = new Uint8Array(n * n * 4);
+                for (var i = 0; i < input.length; ++i) input[i] = (i * 17 + 13) & 255;
+                var actual = generated.processRGBA(input, n, n);
+                var expected = reference.processRGBA(input, n, n);
+                if (!equal(actual, expected))
+                    throw new Error("Generated fallback differs from reference at " + n + "x" + n + ".");
+                if (generated.statistics().activeBlocks !== 0)
+                    throw new Error("Generated fallback leaked allocations.");
+                notes.push(n + "x" + n + ": PASS");
+            }
+            result.textContent = head + "\nPASS: candidate exports, memory and allocation ABI." +
+                "\nGenerated vs known-good JS: " + notes.join(", ") +
+                "\nThis does not yet prove WebAssembly/browser parity for every module.";
+        });
+    }).catch(function (error) {
+        result.textContent = head + "\nFAIL: " + error.message +
+            "\nGenerated code has NOT been substituted for the known-good fallback.";
+    });
+}());
+</script>
+</body>
+</html>

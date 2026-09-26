@@ -73,16 +73,23 @@
             typeof WebAssembly.instantiate !== "function") {
             return Promise.reject(new Error("WebAssembly is unavailable."));
         }
-        if (typeof fetch !== "function") {
-            return Promise.reject(new Error("Fetch is unavailable."));
-        }
         if (typeof options.wasm !== "string" || !options.wasm) {
             return Promise.reject(new Error("A WASM URL is required."));
         }
-        return fetch(options.wasm).then(function (response) {
-            if (!response.ok) throw new Error("WASM HTTP status " + response.status);
-            return response.arrayBuffer();
-        }).then(function (buffer) {
+        var bytes;
+        if (typeof fetch === "function") {
+            bytes = fetch(options.wasm).then(function (response) {
+                if (!response.ok) throw new Error("WASM HTTP status " + response.status);
+                return response.arrayBuffer();
+            });
+        } else if (root.WasmBridgeCompat &&
+                   typeof root.WasmBridgeCompat.loadBytes === "function") {
+            // Optional XHR ponyfill: include legacy-compat.js before wasmbridge.js.
+            bytes = root.WasmBridgeCompat.loadBytes(options.wasm);
+        } else {
+            return Promise.reject(new Error("Fetch is unavailable; include legacy-compat.js for XHR loading."));
+        }
+        return bytes.then(function (buffer) {
             return WebAssembly.instantiate(new Uint8Array(buffer), options.imports || {});
         }).then(function (result) {
             var instance = result.instance || result;
@@ -118,5 +125,5 @@
         });
     }
 
-    root.WasmBridge = { load: load, version: "0.1.0" };
+    root.WasmBridge = { load: load, version: "0.4.0" };
 }(this));

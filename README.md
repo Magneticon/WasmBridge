@@ -9,7 +9,7 @@ Reusable WebAssembly compilation, packaging, and browser-runtime framework. The 
 - The user verified the numeric `add(20,22) = 42` sample running on **Wasm** and with **forced JavaScript fallback** in Firefox 52 on Windows XP x64. On the tested installation, the page also loaded through `file://`. The user also verified the 256×160 RGBA demo with the Wasm backend, JS fallback, bytewise parity and unchanged input on XP Firefox 52.
 - The XP x64 CLI build and managed header-parser self-test passed. The latest recorded XP CLI run could not load `WasmBridge.Native.dll` (0x8007007E); the native DLL's availability/dependencies on the XP machine require investigation. A v0.3 build/run is pending.
 - The managed CLI `WasmBridge.exe` uses the managed API `WasmBridge.Core.dll` (namespace `WasmBridge`) to avoid the original CLR assembly-name collision. `WasmBridge.Native.dll` is the separate XP-native sample library.
-- The fixed-buffer v0.2 RGBA browser test passed on XP Firefox 52 with both backends. The new v0.3 dynamic-memory sample is not yet XP-browser verified.
+- The v0.3 BufferArena screenshot from Firefox 52 on XP verified Wasm execution, JS parity, independent buffers, allocation release, and memory growth for the 256×256 sample. Other image sizes, new generated fallback candidates and toolchain commands remain to be tested there.
 
 ## v0.3 — dynamically managed independent buffers
 
@@ -21,6 +21,15 @@ Reusable WebAssembly compilation, packaging, and browser-runtime framework. The 
 Typed copy access supports u8/u8c/i8/u16/i16/u32/i32/f32/f64 without handing callers a view into mutable Wasm memory. Native Release builds link the XP-compatible CRT statically to reduce external DLL dependencies; the native DLL itself must still be deployed.
 
 The current allocator is a deliberately **bounded prototype**, not a drop-in libc malloc: at most 128 tracked blocks, 32 MiB Wasm linear-memory budget (16 MiB maximum single JS buffer), first-fit free-block reuse without coalescing or shrinking, and synchronous access. Never retain views into Wasm memory across growth or reuse a released handle. Browser benchmarks measure allocation, memory copies, and processing; the XP-native CLI benchmark is reported separately and is not an apples-to-apples browser speed ranking.
+
+## v0.4 — optional external toolchain and Firefox 52.9 ESR compatibility
+
+- `Compiler/ExternalToolchain.cs` and CLI commands `validate-legacy`, `generate-fallback`, `optimize-legacy` integrate **host-installed** WABT (`wasm-validate`), Binaryen (`wasm2js`/`wasm-opt`), and standalone esbuild. They run on the Windows 10 **build host** using the existing XP/.NET 4.0 CLI. These tools are not bundled, and no repo-local build CMD scripts have been added.
+- Generated JS is bundled as a classic-script IIFE for `--target=firefox52`, but **does not automatically replace the verified handwritten fallback**. ABI equivalence, memory behavior and FF52 execution must be checked with `Examples/BufferArena/generated-fallback-probe.html` before switching modules over.
+- `Runtime/legacy-compat.js` is an **optional** helper with capability reporting and a narrowly scoped XHR byte-loader if `fetch` is absent; it does not override working Firefox 52 APIs or attempt to polyfill native WebAssembly.
+- `Tests/test_legacy_compat_node.js` exercises the normal fetch path, optional XHR loader, and JS fallback without Wasm.
+
+Read [Documentation/FF52_COMPATIBILITY.md](Documentation/FF52_COMPATIBILITY.md) for supported syntax, polyfill policy, toolchain setup, browser acceptance tests and the current limits of auto-generated fallbacks. The new toolchain integration has **not yet been run with the external binaries on the user's development host**, and the generated fallback has **not** been XP-browser validated.
 
 ## Samples and components
 

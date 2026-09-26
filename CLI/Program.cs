@@ -34,6 +34,30 @@ namespace WasmBridge.CLI
                     if (!String.IsNullOrEmpty(r.StandardError)) Console.WriteLine(r.StandardError);
                     return 0;
                 }
+                if (command == "validate-legacy")
+                {
+                    ExternalToolchain.ValidateLegacy(Required(p, "wasm"), Required(p, "validator"));
+                    Console.WriteLine("PASS: WABT validated restricted MVP feature profile.");
+                    Console.WriteLine("Actual Firefox 52.9 ESR browser execution and JS loader still require testing.");
+                    return 0;
+                }
+                if (command == "generate-fallback")
+                {
+                    ExternalToolchain.GenerateFallback(Required(p, "wasm"), Required(p, "out"),
+                        Required(p, "wasm2js"), Required(p, "esbuild"), Required(p, "validator"),
+                        p.ContainsKey("global") ? p["global"] : "WasmBridgeGeneratedCandidate");
+                    Console.WriteLine("Generated classic-script candidate: " + Path.GetFullPath(p["out"]));
+                    Console.WriteLine("EXPERIMENTAL: generated exports/memory ABI must be verified before replacing a known-good JS fallback.");
+                    return 0;
+                }
+                if (command == "optimize-legacy")
+                {
+                    ExternalToolchain.OptimizeLegacy(Required(p, "wasm"), Required(p, "out"),
+                        Required(p, "optimizer"), Required(p, "validator"));
+                    Console.WriteLine("PASS: optimized Wasm validated under restricted MVP profile: " +
+                        Path.GetFullPath(p["out"]));
+                    return 0;
+                }
                 if (command == "package")
                 {
                     PackageOptions o = new PackageOptions();
@@ -236,6 +260,10 @@ namespace WasmBridge.CLI
             Console.WriteLine("  package supports optional --adapter Runtime\\buffers.js for multi-buffer modules.");
             Console.WriteLine("  verify --wasm add.wasm     (header only)");
             Console.WriteLine("  self-test                   (managed header, native RGBA8 and buffer-manager tests)");
+            Console.WriteLine("  validate-legacy --wasm module.wasm --validator C:\\path\\to\\wasm-validate.exe");
+            Console.WriteLine("  generate-fallback --wasm module.wasm --out candidate.js --validator path --wasm2js path --esbuild path [--global WasmBridgeGeneratedCandidate]");
+            Console.WriteLine("  optimize-legacy --wasm module.wasm --out optimized.wasm --validator path --optimizer path");
+            Console.WriteLine("  FF52 toolchain generation runs on build host; generated fallback ABI must be browser-tested.");
             Console.WriteLine("For multiple exports, provide comma-separated names with no spaces.");
             Console.WriteLine("External WASM-targeting LLVM/Clang is required to compile; actual browser testing is separate.");
         }

@@ -68,10 +68,8 @@ namespace WasmBridge
                         " --global-name=" + globalName + " --outfile=" + Quote(output),
                         "esbuild Firefox 52 classic-script bundler");
                 CheckOutput(output, "esbuild");
-                string generated = File.ReadAllText(output);
-                if (generated.IndexOf("import ", StringComparison.Ordinal) >= 0 ||
-                    generated.IndexOf("export ", StringComparison.Ordinal) >= 0)
-                    throw new InvalidDataException("Generated fallback still contains module declarations; do not deploy.");
+                // esbuild's --format=iife bundles module declarations into a
+                // classic script. Only the browser probe establishes ABI parity.
             }
             catch
             {

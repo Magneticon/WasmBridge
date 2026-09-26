@@ -41,6 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="WasmCompiler.cs" />
+    <Compile Include="ExternalToolchain.cs" />
     <Compile Include="WasmPackage.cs" />
     <Compile Include="AssemblyInfo.cs" />
   </ItemGroup>

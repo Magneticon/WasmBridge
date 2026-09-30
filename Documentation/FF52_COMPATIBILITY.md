@@ -105,8 +105,38 @@ we consider a module-specific adapter and changing the default fallback.
 For host regression, `node Tests/test_legacy_compat_node.js` exercises
 native-fetch loading, optional XHR loading, and fallback when WebAssembly
 is disabled. This Node check cannot establish FF52 compatibility.
-Current versions of the external tools, the browser UI, and the generated
-fallback should be recorded when debugging output differences.
+The current host-verified versions are WABT 1.0.42, Binaryen version_133 and
+esbuild 0.28.2. Their generated BufferArena candidate passes the Node ABI/parity
+preflight and is recorded alongside a hash manifest. Firefox 52 execution of
+that candidate passed on the installed 32-bit Firefox 52.9 ESR for its exported
+allocator/memory ABI and RGBA parity at 1, 16, 256 and 512 pixels. The generated
+file remains an accepted candidate rather than the default: the smaller,
+reviewable handwritten fallback is still the maintained production asset, and
+the probe does not establish equivalence for unrelated future modules.
+
+The v0.6 manifest-driven package loader was exercised in the installed 32-bit
+Firefox 52.9 ESR over localhost. `Examples/PackageLoader/index.html` reported
+PASS with the native Wasm backend and again with `?fallback=1` using the
+JavaScript backend. Both paths loaded their runtime layers from the v0.2
+manifest, completed the RGBA operation and released every owned handle.
+The updated general-module example also reported PASS in Firefox 52.9 ESR for
+both backends after adding scoped buffers, direct UTF-8 allocation and module
+disposal. The browser and localhost server were closed after each acceptance run.
+Optional typed ABI signatures (`i32`, `f32`, `f64`, and `void`) are now enforced
+by the general runtime. The signed GeneralModule and manifest-driven package
+examples passed in Firefox 52.9 ESR with both native Wasm and forced JavaScript
+fallback backends.
+After allocator coalescing and tail reclamation were added, `buffers.wasm` and
+the Binaryen candidate were regenerated, hash-checked, and rerun through the
+Firefox 52 generated-fallback, general-module, and package-loader pages. All
+affected Wasm and JavaScript paths reported PASS.
+
+`Tools\Test-All.ps1` now automates the full acceptance matrix. On the current
+host, Firefox 52.9 ESR reported PASS for HelloWorld, ImageProcessing,
+BufferArena, GeneralModule, and PackageLoader using both Wasm and forced
+JavaScript where applicable, plus the generated-fallback probe. The harness
+uses a dedicated profile, reads unambiguous page titles, and closes Firefox and
+the localhost server in cleanup.
 
 ## Compatibility and security cautions
 

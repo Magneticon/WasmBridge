@@ -20,6 +20,56 @@ typedef struct wb_block {
 static wb_block wb_blocks[WB_SLOTS];
 #ifdef __wasm__
 static unsigned int wb_next;
+
+static void wb_clear_block(wb_block *block)
+{
+    block->address = NULL;
+    block->capacity = 0;
+    block->active = 0;
+}
+
+static void wb_coalesce_and_trim(void)
+{
+    int i, j, changed = 1;
+    while (changed) {
+        changed = 0;
+        for (i = 0; i < WB_SLOTS && !changed; ++i) {
+            unsigned int i_start;
+            if (wb_blocks[i].active || !wb_blocks[i].address) continue;
+            i_start = (unsigned int)(uintptr_t)wb_blocks[i].address;
+            for (j = i + 1; j < WB_SLOTS; ++j) {
+                unsigned int j_start;
+                if (wb_blocks[j].active || !wb_blocks[j].address) continue;
+                j_start = (unsigned int)(uintptr_t)wb_blocks[j].address;
+                if (i_start + wb_blocks[i].capacity == j_start) {
+                    wb_blocks[i].capacity += wb_blocks[j].capacity;
+                    wb_clear_block(&wb_blocks[j]);
+                    changed = 1;
+                    break;
+                }
+                if (j_start + wb_blocks[j].capacity == i_start) {
+                    wb_blocks[j].capacity += wb_blocks[i].capacity;
+                    wb_clear_block(&wb_blocks[i]);
+                    changed = 1;
+                    break;
+                }
+            }
+        }
+    }
+    changed = 1;
+    while (changed) {
+        changed = 0;
+        for (i = 0; i < WB_SLOTS; ++i) {
+            if (!wb_blocks[i].active && wb_blocks[i].address &&
+                (unsigned int)(uintptr_t)wb_blocks[i].address + wb_blocks[i].capacity == wb_next) {
+                wb_next = (unsigned int)(uintptr_t)wb_blocks[i].address;
+                wb_clear_block(&wb_blocks[i]);
+                changed = 1;
+                break;
+            }
+        }
+    }
+}
 #endif
 
 static wb_block *wb_lookup(unsigned char *pointer, int only_active)
@@ -83,6 +133,8 @@ int wb_free(unsigned char *pointer)
     free(block->address);
     block->address = NULL;
     block->capacity = 0;
+#else
+    wb_coalesce_and_trim();
 #endif
     return 1;
 }

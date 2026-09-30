@@ -1,6 +1,7 @@
 # The local build outputs and operators' machine-specific diagnostics
 .vs/
 bin/
+artifacts/
 **/obj/
 *.user
 *.suo

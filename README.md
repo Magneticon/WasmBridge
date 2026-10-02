@@ -4,6 +4,14 @@ Reusable WebAssembly compilation, packaging, and browser-runtime framework. The 
 
 **Windows builds are XP-only.** Use Visual Studio 2022 with the traditional `WasmBridge.sln` (no .slnx), native `v141_xp`, .NET Framework 4.0, and x86/x64 configurations. The Windows 10 workstation is the build host; there is no separate W10 build/run configuration or repository-local build CMD script.
 
+## Documentation
+
+- [Programmer's Guide](Documentation/PROGRAMMING_GUIDE.md) — end-to-end programming model, ABI design, C/C++ builds, JavaScript integration/fallbacks, C# migration guidance, memory ownership, packaging, validation, testing, and troubleshooting.
+- [API Reference](Documentation/API_REFERENCE.md) — concise browser API and CLI reference.
+- [Getting Started](Documentation/GETTING_STARTED.md) — build-host prerequisites and setup.
+- [Firefox 52 Compatibility](Documentation/FF52_COMPATIBILITY.md) — legacy JavaScript/WebAssembly compatibility rules and toolchain gates.
+- [XP Firefox Test Endpoint](Documentation/XP_FIREFOX_TEST_ENDPOINT.md) — standard `192.168.255.2:8084` browser-test configuration.
+
 ## Status
 
 - The user verified the numeric `add(20,22) = 42` sample running on **Wasm** and with **forced JavaScript fallback** in Firefox 52 on Windows XP x64. On the tested installation, the page also loaded through `file://`. The user also verified the 256×160 RGBA demo with the Wasm backend, JS fallback, bytewise parity and unchanged input on XP Firefox 52.

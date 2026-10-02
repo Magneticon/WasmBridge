@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>WasmBridge - multi-buffer memory and benchmark (Firefox 52)</title>
+<title>WasmBridge BufferArena - RUNNING</title>
 <style>
 body { font: 14px Arial,sans-serif; max-width: 940px; margin: 22px auto; padding: 0 15px; color: #292929; }
 h1 { font-size: 23px; }
@@ -48,6 +48,7 @@ byte-for-byte RGBA parity. The buffer manager is reusable; color inversion is on
     var sourceCanvas = document.getElementById("before");
     var outputCanvas = document.getElementById("after");
     var serial = 0;
+    if (location.search.indexOf("fallback=1") >= 0) force.checked = true;
     function now() { return window.performance && performance.now ? performance.now() : Date.now(); }
     function assert(condition, message) { if (!condition) throw new Error(message); }
     function same(a, b) {
@@ -156,9 +157,13 @@ byte-for-byte RGBA parity. The buffer manager is reusable; color inversion is on
                     "\nTiming includes allocation, input/output copies and RGB processing; not a native-C benchmark." +
                     "\nDiagnostics: " + (selected.diagnostic || "(none)") +
                     "\nBrowser: " + navigator.userAgent;
+                document.title = "PASS - WasmBridge BufferArena (" + selected.backend + ")";
             });
         }).catch(function (e) {
-            if (mine === serial) report.textContent = "FAIL: " + e.message;
+            if (mine === serial) {
+                report.textContent = "FAIL: " + e.message;
+                document.title = "FAIL - WasmBridge BufferArena";
+            }
         }).then(function () {
             if (mine === serial) runButton.disabled = false;
         });

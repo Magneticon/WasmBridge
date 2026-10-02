@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WasmBridge package loader - RUNNING</title>
+<style>body{font:16px sans-serif;max-width:760px;margin:40px auto}pre{padding:16px;border:1px solid #aaa}</style>
+</head>
+<body>
+<h1>Package loader</h1>
+<label><input id="fallback" type="checkbox"> Force JavaScript fallback</label>
+<button id="run" type="button">Run checks</button>
+<pre id="result">RUNNING</pre>
+<script src="../../Runtime/package.js"></script>
+<script>
+(function () {
+    "use strict";
+    var result = document.getElementById("result");
+    if (location.search.indexOf("fallback=1") >= 0)
+        document.getElementById("fallback").checked = true;
+    function run() {
+        result.textContent = "RUNNING";
+        document.title = "WasmBridge package loader - RUNNING";
+        WasmBridgePackage.load({
+            manifest: "manifest.json",
+            preferWasm: !document.getElementById("fallback").checked
+        }).then(function (module) {
+            var input = module.allocate(8), output = module.allocate(8);
+            try {
+                module.write(input, new Uint8Array([1, 2, 3, 4, 200, 100, 0, 128]));
+                if (module.call("wb_invert_rgba", input.pointer, output.pointer, 8) !== 8)
+                    throw new Error("RGBA call failed.");
+                var actual = module.read(output);
+                var expected = [254, 253, 252, 4, 55, 155, 255, 128];
+                for (var i = 0; i < expected.length; ++i)
+                    if (actual[i] !== expected[i]) throw new Error("Byte mismatch at " + i + ".");
+            } finally {
+                module.release(output);
+                module.release(input);
+            }
+            if (module.statistics().activeHandles !== 0) throw new Error("Handle leak.");
+            result.textContent = "PASS\nBackend: " + module.backend +
+                "\nFormat: " + module.packageManifest.format + "\nNo live handles";
+            document.title = "PASS - WasmBridge package loader (" + module.backend + ")";
+        }).catch(function (error) {
+            result.textContent = "FAIL [" + (error.phase || "unknown") + "]: " + error.message;
+            document.title = "FAIL - WasmBridge package loader";
+        });
+    }
+    document.getElementById("run").onclick = run;
+    run();
+}());
+</script>
+</body>
+</html>

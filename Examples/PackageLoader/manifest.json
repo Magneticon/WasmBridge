@@ -1,0 +1,19 @@
+{
+  "format": "wasmbridge-package-0.2",
+  "wasm": "../BufferArena/buffers.wasm",
+  "fallback": "../BufferArena/buffers-fallback.js",
+  "runtime": "../../Runtime/wasmbridge.js",
+  "moduleRuntime": "../../Runtime/module.js",
+  "exports": ["wb_active_count", "wb_invert_rgba"],
+  "signatures": {
+    "wb_active_count": {"parameters": [], "result": "i32"},
+    "wb_invert_rgba": {"parameters": ["i32", "i32", "i32"], "result": "i32"}
+  },
+  "fallbackGlobal": "WasmBridgeBuffersFallback",
+  "allocator": {
+    "allocate": "wb_alloc",
+    "release": "wb_free",
+    "capacity": "wb_capacity"
+  },
+  "memoryExport": "memory"
+}

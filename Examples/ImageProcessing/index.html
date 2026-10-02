@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>WasmBridge - RGBA buffer and Canvas test (Firefox 52)</title>
+<title>WasmBridge ImageProcessing - RUNNING</title>
 <style>
 body { font: 14px Arial, sans-serif; max-width: 950px; margin: 24px auto; padding: 0 16px; color: #242424; }
 h1 { font-size: 22px; }
@@ -43,6 +43,7 @@ The test also compares against a separate reference algorithm.</small>
     var upload = document.getElementById("upload");
     var generation = 0;
     var sourceWidth = 256, sourceHeight = 160, source = null;
+    if (location.search.indexOf("fallback=1") >= 0) forceJS.checked = true;
 
     function sample(width, height) {
         var data = new Uint8ClampedArray(width * height * 4);
@@ -120,6 +121,8 @@ The test also compares against a separate reference algorithm.</small>
                     "\n" + parityLabel + ": " + (parity ? "PASS" : "FAIL") +
                     "\nDiagnostics: " + (primary.diagnostic || "(none)") +
                     "\nBrowser: " + navigator.userAgent;
+                document.title = (correct && unchanged && parity ? "PASS" : "FAIL") +
+                    " - WasmBridge ImageProcessing (" + primary.backend + ")";
             }
             if (primary.backend !== "wasm") {
                 render(true, "Fallback selected");
@@ -130,7 +133,10 @@ The test also compares against a separate reference algorithm.</small>
                 render(equalBytes(output, jsOutput), "Wasm vs JS identical");
             });
         }).catch(function (error) {
-            if (myRun === generation) status.textContent = "FAIL: " + error.message;
+            if (myRun === generation) {
+                status.textContent = "FAIL: " + error.message;
+                document.title = "FAIL - WasmBridge ImageProcessing";
+            }
         });
     }
 

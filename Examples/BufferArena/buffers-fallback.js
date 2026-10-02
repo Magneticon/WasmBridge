@@ -17,24 +17,55 @@
     var blocks = [], next = 8192;
     function lookup(pointer) {
         for (var i = 0; i < blocks.length; ++i)
-            if (blocks[i].pointer === pointer && blocks[i].active) return blocks[i];
+            if (blocks[i] && blocks[i].pointer === pointer && blocks[i].active) return blocks[i];
         return null;
+    }
+    function coalesceAndTrim() {
+        var changed = true, i, j, a, b;
+        while (changed) {
+            changed = false;
+            for (i = 0; i < blocks.length && !changed; ++i) {
+                a = blocks[i];
+                if (!a || a.active) continue;
+                for (j = i + 1; j < blocks.length; ++j) {
+                    b = blocks[j];
+                    if (!b || b.active) continue;
+                    if (a.pointer + a.capacity === b.pointer) {
+                        a.capacity += b.capacity; blocks[j] = null; changed = true; break;
+                    }
+                    if (b.pointer + b.capacity === a.pointer) {
+                        b.capacity += a.capacity; blocks[i] = null; changed = true; break;
+                    }
+                }
+            }
+        }
+        changed = true;
+        while (changed) {
+            changed = false;
+            for (i = 0; i < blocks.length; ++i) {
+                a = blocks[i];
+                if (a && !a.active && a.pointer + a.capacity === next) {
+                    next = a.pointer; blocks[i] = null; changed = true; break;
+                }
+            }
+        }
     }
     function alloc(bytes) {
         if (!Number.isInteger(bytes) || bytes <= 0 || bytes > LIMIT) return 0;
         var size = (bytes + 7) & ~7;
         var empty = -1;
         for (var i = 0; i < blocks.length; ++i) {
+            if (!blocks[i]) { if (empty < 0) empty = i; continue; }
             if (!blocks[i].active && blocks[i].capacity >= size) {
                 blocks[i].active = true;
                 return blocks[i].pointer;
             }
         }
-        if (blocks.length < SLOTS) empty = blocks.length;
+        if (empty < 0 && blocks.length < SLOTS) empty = blocks.length;
         if (empty < 0 || next + size > LIMIT || next + size > memory.buffer.byteLength) return 0;
         var pointer = next;
         next += size;
-        blocks.push({pointer: pointer, capacity: size, active: true});
+        blocks[empty] = {pointer: pointer, capacity: size, active: true};
         return pointer;
     }
     root.WasmBridgeBuffersFallback = {
@@ -44,6 +75,7 @@
             var block = lookup(pointer);
             if (!block) return 0;
             block.active = false;
+            coalesceAndTrim();
             return 1;
         },
         wb_capacity: function (pointer) {
@@ -52,7 +84,7 @@
         },
         wb_active_count: function () {
             var count = 0;
-            for (var i = 0; i < blocks.length; ++i) if (blocks[i].active) ++count;
+            for (var i = 0; i < blocks.length; ++i) if (blocks[i] && blocks[i].active) ++count;
             return count;
         },
         wb_invert_rgba: function (src, dst, bytes) {

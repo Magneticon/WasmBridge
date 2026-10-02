@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WasmBridge general module API - RUNNING</title>
+<style>
+body { font: 14px Arial,sans-serif; margin: 22px auto; max-width: 850px; padding: 0 14px; }
+button { margin: 8px 0; padding: 5px 12px; }
+pre { padding: 12px; border: 1px solid #999; white-space: pre-wrap; }
+</style>
+<script src="../../Runtime/legacy-compat.js"></script>
+<script src="../../Runtime/wasmbridge.js"></script>
+<script src="../../Runtime/module.js"></script>
+<script src="../BufferArena/buffers-fallback.js"></script>
+</head>
+<body>
+<h1>General module API</h1>
+<label><input id="fallback" type="checkbox"> Force JavaScript fallback</label>
+<button id="run" type="button">Run checks</button>
+<pre id="result">Waiting...</pre>
+<script>
+(function () {
+    "use strict";
+    var result = document.getElementById("result");
+    if (location.search.indexOf("fallback=1") >= 0)
+        document.getElementById("fallback").checked = true;
+    var allocator = {allocate: "wb_alloc", release: "wb_free", capacity: "wb_capacity"};
+    function options() {
+        return {
+            wasm: "../BufferArena/buffers.wasm",
+            fallback: window.WasmBridgeBuffersFallback,
+            preferWasm: !document.getElementById("fallback").checked,
+            exports: ["wb_active_count", "wb_invert_rgba"],
+            allocator: allocator,
+            signatures: {
+                wb_active_count: {parameters: [], result: "i32"},
+                wb_invert_rgba: {parameters: ["i32", "i32", "i32"], result: "i32"}
+            }
+        };
+    }
+    function equal(a, b) {
+        if (a.length !== b.length) return false;
+        for (var i = 0; i < a.length; ++i) if (a[i] !== b[i]) return false;
+        return true;
+    }
+    function run() {
+        result.textContent = "Running...";
+        Promise.all([WasmBridgeModule.load(options()), WasmBridgeModule.load(options())])
+        .then(function (modules) {
+            var first = modules[0], second = modules[1], notes = [];
+            var text = "WasmBridge \u2713 \u03a9 \ud83d\ude80";
+            var encoded = WasmBridgeModule.encodeUTF8(text);
+            var textHandle = first.allocate(encoded.length + 1);
+            first.writeString(textHandle, text);
+            if (first.readString(textHandle) !== text) throw new Error("UTF-8 string round trip failed.");
+            try { second.read(textHandle); throw new Error("Foreign handle was accepted."); }
+            catch (foreignError) {
+                if (foreignError.message === "Foreign handle was accepted.") throw foreignError;
+            }
+            first.release(textHandle);
+            notes.push("UTF-8 and instance ownership: PASS");
+
+            var typed = first.allocate(32);
+            first.writeTyped(typed, "f64", new Float64Array([1.25, -19.5, 0.125]));
+            var numbers = first.readTyped(typed, "f64", 3);
+            if (numbers[0] !== 1.25 || numbers[1] !== -19.5 || numbers[2] !== 0.125)
+                throw new Error("Typed numeric copy failed.");
+            first.release(typed);
+            notes.push("Typed numeric copies: PASS");
+
+            var scoped = first.withBuffer(8, function (handle) {
+                first.write(handle, new Uint8Array([7, 8, 9]));
+                return first.read(handle, 3)[2];
+            });
+            if (scoped !== 9 || first.statistics().activeHandles !== 0)
+                throw new Error("Scoped buffer cleanup failed.");
+            var allocatedText = first.allocateString("allocated \u2713");
+            if (first.readString(allocatedText) !== "allocated \u2713")
+                throw new Error("Allocated UTF-8 string failed.");
+            first.release(allocatedText);
+            notes.push("Scoped buffers and UTF-8 allocation: PASS");
+
+            var source = first.allocate(4), destination = first.allocate(4);
+            first.write(source, new Uint8Array([1, 2, 3, 4]));
+            if (first.call("wb_invert_rgba", source.pointer, destination.pointer, 4) !== 4 ||
+                !equal(first.read(destination), new Uint8Array([254, 253, 252, 4])))
+                throw new Error("Direct exported function call failed.");
+            first.release(destination); first.release(source);
+            if (first.statistics().activeHandles !== 0 || first.call("wb_active_count") !== 0)
+                throw new Error("Module leaked allocations.");
+            notes.push("Direct call and release: PASS");
+            first.dispose(); second.dispose();
+            if (!first.statistics().disposed) throw new Error("Module disposal failed.");
+            notes.push("Module disposal: PASS");
+            result.textContent = "PASS\nBackend: " + first.backend +
+                "\nFailure phase: " + (first.failurePhase || "none") +
+                "\n" + notes.join("\n");
+            document.title = "PASS - WasmBridge general module (" + first.backend + ")";
+        }).catch(function (error) {
+            result.textContent = "FAIL: " + error.message;
+            document.title = "FAIL - WasmBridge general module";
+        });
+    }
+    document.getElementById("run").onclick = run;
+    run();
+}());
+</script>
+</body>
+</html>

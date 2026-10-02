@@ -13,6 +13,17 @@ int main(void) {
     for(i=0;i<8;i++)if(b[i]!=expected[i])return 3;
     if(!wb_free(b)||wb_free(b)||wb_invert_rgba(a,b,8)!=-1) return 4;
     if(!wb_free(a)||!wb_free(c)||wb_active_count()!=0) return 5;
+    for(i=0;i<1000;i++) {
+        unsigned char *items[64];
+        int j;
+        for(j=0;j<64;j++) {
+            items[j]=wb_alloc(8+((i*17+j*29)%1024));
+            if(!items[j]) return 6;
+        }
+        for(j=0;j<64;j+=2)if(!wb_free(items[j]))return 7;
+        for(j=1;j<64;j+=2)if(!wb_free(items[j]))return 8;
+        if(wb_active_count()!=0)return 9;
+    }
     puts("PASS: native multi-buffer allocation, RGB inversion, alpha preservation, release and bounds");
     return 0;
 }

@@ -1,0 +1,14 @@
+{
+  "status": "firefox52-accepted-candidate",
+  "input": "buffers.wasm",
+  "inputSha256": "d6fee56ebcd7de253ab929c535b3cbe3b8274d8d38ededf5bc10dff264a5a7f5",
+  "output": "buffers-generated-candidate.js",
+  "outputSha256": "eb58ee8b9dedb30d044130303d51446586d575310ec035b5aa9637b60936104c",
+  "tools": {
+    "wabt": "1.0.42",
+    "binaryen": "version_133",
+    "esbuild": "0.28.2"
+  },
+  "hostValidation": "Tests/test_generated_fallback_node.js passes; Firefox 52.9 generated-fallback probe passes",
+  "defaultFallbackChanged": false
+}

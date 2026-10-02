@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>WasmBridge — experimental wasm2js fallback compatibility probe</title>
+<title>WasmBridge generated fallback - RUNNING</title>
 <style>
 body { font: 14px Arial,sans-serif; margin: 22px auto; max-width: 850px; padding: 0 14px; }
 pre { padding: 12px; border: 1px solid #999; white-space: pre-wrap; }
@@ -33,6 +33,7 @@ the production BufferArena example continues using its proven handwritten JS fal
     if (!candidate) {
         result.textContent = head + "\nPENDING: generated candidate not loaded. " +
             "Create buffers-generated-candidate.js with the host toolchain first.";
+        document.title = "PENDING - WasmBridge generated fallback";
         return;
     }
     function equal(a, b) {
@@ -67,10 +68,12 @@ the production BufferArena example continues using its proven handwritten JS fal
             result.textContent = head + "\nPASS: candidate exports, memory and allocation ABI." +
                 "\nGenerated vs known-good JS: " + notes.join(", ") +
                 "\nThis does not yet prove WebAssembly/browser parity for every module.";
+            document.title = "PASS - WasmBridge generated fallback";
         });
     }).catch(function (error) {
         result.textContent = head + "\nFAIL: " + error.message +
             "\nGenerated code has NOT been substituted for the known-good fallback.";
+        document.title = "FAIL - WasmBridge generated fallback";
     });
 }());
 </script>

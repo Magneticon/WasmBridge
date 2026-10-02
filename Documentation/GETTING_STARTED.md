@@ -1,10 +1,18 @@
-# WasmBridge 0.1: build and smoke test
+# WasmBridge 0.7: build, package, and validate
+
+For the public runtime and CLI surface, see [API_REFERENCE.md](API_REFERENCE.md).
 
 ## Windows XP-only build and compatibility
 
 - Visual Studio 2022 uses the traditional `WasmBridge.sln`, not `.slnx`.
 - Windows executables and libraries target **XP only**: native `v141_xp`, managed **.NET Framework 4.0**, x86 and x64 solution configurations. The Windows 10 machine is a **build host**, not a separate W10 build/run target.
 - The operator's existing external AIEXE/MSBuild workflow builds the solution; there are no repository-local build CMD scripts or `AI_RUN_W10.bat`.
+- For ordinary non-administrator development-host checks, run
+  `powershell -ExecutionPolicy Bypass -File Tools\Check-Environment.ps1`.
+  `Tools\Build-Host.ps1` is a thin PowerShell convenience wrapper around the
+  traditional solution; it does not add a Windows 10 product configuration or
+  replace the operator's AIEXE/XP validation workflow. Both scripts use explicit
+  installed paths and make no machine-wide changes.
 - Managed API: `WasmBridge.Core.dll` (C# namespace `WasmBridge`); managed CLI: `WasmBridge.exe`; optional native sample: `WasmBridge.Native.dll`. Native and managed architectures are matched per solution platform.
 - The CLI and managed DLL previously both had the CLR assembly name `WasmBridge`. The XP run in `WasmBridge_out.txt` crashed with `System.TypeLoadException` for `WasmBridge.CompileOptions` in assembly `WasmBridge, Version=0.0.0.0`. The project now gives the API the distinct assembly name `WasmBridge.Core` to prevent the CLI EXE from being resolved in place of the API DLL. The next XP run passed: the CLI loaded the managed API and its header parser returned exit code 0.
 - Final Release binaries are staged together under `bin\Release\WXP\x86\` or `bin\Release\WXP\x64\`, with per-project intermediate directories. No W10 output tree is maintained.
@@ -18,13 +26,75 @@ Run from the repository root with a WASM-capable Clang installed:
 
     bin\Release\WXP\x64\WasmBridge.exe build --source Core\math.c --out Examples\HelloWorld\add.wasm --export add
 
-For a compiler not on PATH, append `--clang C:\path\to\clang.exe`. The CLI invokes a minimal freestanding compile using `--target=wasm32 -O2 -nostdlib -Wl,--no-entry -Wl,--export-memory -Wl,--export=add -Wl,--strip-all`. Use comma-separated names with `--export` for multiple function exports. These flags request a minimal build; they do **not** prove that an arbitrary module uses only MVP features. Compiler version, supported flags, imports and export signatures must be checked on each target. Do not attempt to compile Win32, CUDA or other platform-specific calls into a browser module.
+For a compiler not on PATH, append `--clang C:\path\to\clang.exe`. The
+portable LLVM root can also be passed to the environment checker as
+`-LlvmRoot`, or supplied through the optional user variable
+`WASMBRIDGE_LLVM`. No system PATH change is required. The CLI invokes a minimal freestanding compile using `--target=wasm32 -O2 -nostdlib -Wl,--no-entry -Wl,--export-memory -Wl,--export=add -Wl,--strip-all`. Use comma-separated names with `--export` for multiple function exports. These flags request a minimal build; they do **not** prove that an arbitrary module uses only MVP features. Compiler version, supported flags, imports and export signatures must be checked on each target. Do not attempt to compile Win32, CUDA or other platform-specific calls into a browser module.
 
 For a deployable bundle:
 
     bin\Release\WXP\x64\WasmBridge.exe package --wasm Examples\HelloWorld\add.wasm --fallback Examples\HelloWorld\add.js --runtime Runtime\wasmbridge.js --out dist
 
 The bundle contains a module, fallback, loader and informational JSON manifest with SHA-256 hashes. The manifest does not authenticate untrusted data or validate Wasm feature requirements. The v0.1 API is currently focused on a single numeric export, not a generic C++ runtime, binary-buffer ABI or complete import parser.
+
+To package a general v0.5 module with an allocator ABI:
+
+    bin\Release\WXP\x64\WasmBridge.exe package --wasm Examples\BufferArena\buffers.wasm --fallback Examples\BufferArena\buffers-fallback.js --runtime Runtime\wasmbridge.js --module-runtime Runtime\module.js --out dist\buffers --export wb_active_count,wb_invert_rgba --allocator wb_alloc,wb_free,wb_capacity --memory-export memory --fallback-global WasmBridgeBuffersFallback
+
+Supplying `--module-runtime` selects manifest format `wasmbridge-package-0.2`.
+The manifest records the public exports, optional `allocate,release[,capacity]`
+ABI, memory export, fallback global and SHA-256 for each copied artifact. These
+hashes detect accidental changes; they are not a signature or trust mechanism.
+Omitting `--module-runtime` retains the original v0.1 package shape.
+
+Verify a completed package before deployment:
+
+    bin\Release\WXP\x64\WasmBridge.exe verify-package --manifest dist\buffers\manifest.json
+
+This validates the manifest format, keeps every artifact path inside the
+package directory, checks required files and hashes, verifies the Wasm header,
+and rejects duplicate exports and unexpected files. It detects corruption and
+packaging mistakes but does not establish publisher authenticity.
+
+To consume a trusted package manifest directly in a classic-script browser,
+include `Runtime/package.js` and call:
+
+    WasmBridgePackage.load({manifest: "dist/buffers/manifest.json"}).then(function (module) {
+        console.log(module.backend, module.packageManifest.format);
+    });
+
+The package loader fetches the JSON manifest, resolves every artifact relative
+to it, loads `wasmbridge.js` and (for v0.2) `module.js` in order, then delegates
+to the appropriate runtime API. A v0.2 manifest should name `fallbackGlobal` so
+the fallback script can be resolved if Wasm is disabled or rejected. Only load
+packages and fallback scripts from trusted locations. Recorded SHA-256 values
+are useful for deployment auditing but are not signatures and are not enforced
+by the browser loader.
+
+For the general v0.5 API, include `Runtime/module.js` immediately after
+`Runtime/wasmbridge.js`. `WasmBridgeModule.load()` accepts declared exports,
+imports, a JS fallback, and optional allocator export names. It provides direct
+function calls plus owned byte, typed-array and UTF-8 string copies. It never
+returns a live Wasm-memory view. See `Tests/test_module_node.js` for complete
+multi-instance and allocator examples.
+
+Use `allocateString(text)` when a null-terminated UTF-8 allocation is needed,
+or `withBuffer(bytes, callback)` for temporary work. `withBuffer` releases its
+handle after a synchronous callback or after a returned Promise settles. Call
+`dispose()` when an instance is no longer needed; it releases all remaining
+owned handles, is safe to call again, and prevents later module operations.
+Pass `--signatures path\\to\\signatures.json` while packaging to embed optional
+function contracts. Each export maps to `parameters` and `result`; supported
+types are `i32`, `f32`, `f64`, and `void` for results. The runtime checks arity
+and JavaScript values before invoking the backend and validates its result.
+`i64` is intentionally excluded from this Firefox 52 numeric interface.
+
+To exercise the optional host toolchain without modifying checked-in fixtures:
+
+    powershell -ExecutionPolicy Bypass -File Tools\Test-ExternalToolchain.ps1
+
+Portable tools default to `C:\CODEX\TOOLS\WasmBridge`; use `-ToolRoot` or the
+optional `WASMBRIDGE_TOOLS` user variable for a different location.
 
 ## Actual XP Firefox execution test (manual)
 
@@ -92,7 +162,7 @@ Pointers from Wasm are **32-bit byte offsets into the module's exported linear m
 
 The Wasm module uses an eight-byte-aligned bump allocator starting at linker-provided `__heap_base`, a bounded 128-entry metadata table, and first-fit freed-block reuse. If there is insufficient linear memory, the *JavaScript adapter* grows `exports.memory` by 64 KiB pages and retries; C functions never silently access beyond available memory. The native DLL uses CRT `malloc/free`, tracked through the same slot table. The JS fallback implements the equivalent API with a growable `ArrayBuffer`.
 
-**Limits:** 32 MiB linear-memory budget in the adapter/allocator, 16 MiB maximum individual JS allocation, 128 tracked allocations, at most 2048 pixels per RGBA dimension. Freed Wasm blocks can be reused, but the first version does not coalesce fragments or shrink linear memory. Heavy allocation churn with many different sizes can exhaust the slot table or address space even if many blocks were freed. The raw C ABI cannot reliably detect every stale pointer after address reuse; the JS adapter enforces handle identity and rejects use-after-release. `writeTyped(handle, type, typedArray)` and `readTyped(handle, type, count)` additionally copy u8/u8c/i8/u16/i16/u32/i32/f32/f64 data; they never return a live view into module memory.
+**Limits:** 32 MiB linear-memory budget in the adapter/allocator, 16 MiB maximum individual JS allocation, 128 tracked allocations, at most 2048 pixels per RGBA dimension. Freed Wasm blocks are reused, adjacent free blocks are coalesced, and free tail address space is reclaimed. WebAssembly linear memory cannot shrink after growth. The raw C ABI cannot reliably detect every stale pointer after address reuse; the JS adapter enforces handle identity and rejects use-after-release. `writeTyped(handle, type, typedArray)` and `readTyped(handle, type, count)` additionally copy u8/u8c/i8/u16/i16/u32/i32/f32/f64 data; they never return a live view into module memory.
 
 ### Browser API and lifetime
 

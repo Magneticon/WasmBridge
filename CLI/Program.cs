@@ -34,6 +34,26 @@ namespace WasmBridge.CLI
                     if (!String.IsNullOrEmpty(r.StandardError)) Console.WriteLine(r.StandardError);
                     return 0;
                 }
+                if (command == "build-emscripten")
+                {
+                    EmscriptenCompileOptions o = new EmscriptenCompileOptions();
+                    if (!p.ContainsKey("source") && !p.ContainsKey("sources"))
+                        throw new ArgumentException("Missing --source or --sources");
+                    if (p.ContainsKey("source")) o.SourceFile = p["source"];
+                    o.OutputFile = Required(p, "out");
+                    if (p.ContainsKey("emcc")) o.EmccPath = p["emcc"];
+                    if (p.ContainsKey("export")) o.ExportName = p["export"];
+                    if (p.ContainsKey("sources")) o.SourceFiles = SplitList(p["sources"]);
+                    if (p.ContainsKey("include")) o.IncludeDirectories = SplitList(p["include"]);
+                    if (p.ContainsKey("define")) o.Defines = SplitList(p["define"]);
+                    if (p.ContainsKey("timeout")) o.TimeoutMilliseconds = Int32.Parse(p["timeout"]);
+                    CompileResult r = WasmCompiler.CompileEmscriptenC(o);
+                    Console.WriteLine("Built standalone Emscripten module " + r.OutputFile);
+                    Console.WriteLine("Emscripten exit: " + r.ExitCode);
+                    if (!String.IsNullOrEmpty(r.StandardOutput)) Console.WriteLine(r.StandardOutput);
+                    if (!String.IsNullOrEmpty(r.StandardError)) Console.WriteLine(r.StandardError);
+                    return 0;
+                }
                 if (command == "validate-legacy")
                 {
                     ExternalToolchain.ValidateLegacy(Required(p, "wasm"), Required(p, "validator"));
@@ -65,8 +85,13 @@ namespace WasmBridge.CLI
                     o.FallbackFile = Required(p, "fallback");
                     o.RuntimeFile = Required(p, "runtime");
                     if (p.ContainsKey("adapter")) o.AdapterFile = p["adapter"];
+                    if (p.ContainsKey("module-runtime")) o.ModuleRuntimeFile = p["module-runtime"];
                     o.OutputDirectory = Required(p, "out");
                     if (p.ContainsKey("export")) o.ExportName = p["export"];
+                    if (p.ContainsKey("allocator")) o.AllocatorName = p["allocator"];
+                    if (p.ContainsKey("memory-export")) o.MemoryExport = p["memory-export"];
+                    if (p.ContainsKey("fallback-global")) o.FallbackGlobal = p["fallback-global"];
+                    if (p.ContainsKey("signatures")) o.SignaturesFile = p["signatures"];
                     Console.WriteLine("Package manifest: " + WasmPackage.Create(o));
                     return 0;
                 }
@@ -76,6 +101,13 @@ namespace WasmBridge.CLI
                     WasmPackage.VerifyHeader(filename);
                     Console.WriteLine("PASS: WASM magic/version only: " + Path.GetFullPath(filename));
                     Console.WriteLine("Browser/feature/export compatibility NOT verified.");
+                    return 0;
+                }
+                if (command == "verify-package")
+                {
+                    string manifest = Required(p, "manifest");
+                    string format = WasmPackage.VerifyPackage(manifest);
+                    Console.WriteLine("PASS: " + format + " structure, containment, artifacts, hashes and WASM header.");
                     return 0;
                 }
                 if (command == "self-test")
@@ -251,14 +283,27 @@ namespace WasmBridge.CLI
             return value;
         }
 
+        private static string[] SplitList(string value)
+        {
+            string[] parts = (value ?? "").Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) throw new ArgumentException("List option cannot be empty.");
+            return parts;
+        }
+
         private static void Help()
         {
-            Console.WriteLine("WasmBridge 0.1 - XP/.NET 4.0 compatible build/packaging frontend");
+            Console.WriteLine("WasmBridge 0.7.0-dev - XP/.NET 4.0 compatible build/packaging frontend");
             Console.WriteLine("  build --source Core\\math.c --out add.wasm [--clang path] [--export add]");
             Console.WriteLine("  build --source Core\\image.c --out rgba.wasm --export wb_rgba_buffer,wb_rgba_capacity,wb_rgba_invert");
+            Console.WriteLine("  build-emscripten --source library.c --out library.wasm [--emcc path] [--export function1,function2]");
+            Console.WriteLine("  build-emscripten also accepts --sources a.c;b.cpp --include dir1;dir2 --define NAME;VALUE=1");
             Console.WriteLine("  package --wasm add.wasm --fallback Examples\\HelloWorld\\add.js --runtime Runtime\\wasmbridge.js --out dist [--export add]");
-            Console.WriteLine("  package supports optional --adapter Runtime\\buffers.js for multi-buffer modules.");
+            Console.WriteLine("  package supports optional --adapter Runtime\\buffers.js for specialized adapters.");
+            Console.WriteLine("  general packages: --module-runtime Runtime\\module.js --allocator wb_alloc,wb_free,wb_capacity");
+            Console.WriteLine("                    [--memory-export memory] [--fallback-global WasmBridgeBuffersFallback]");
+            Console.WriteLine("                    [--signatures Examples\\BufferArena\\signatures.json]");
             Console.WriteLine("  verify --wasm add.wasm     (header only)");
+            Console.WriteLine("  verify-package --manifest dist\\manifest.json");
             Console.WriteLine("  self-test                   (managed header, native RGBA8 and buffer-manager tests)");
             Console.WriteLine("  validate-legacy --wasm module.wasm --validator C:\\path\\to\\wasm-validate.exe");
             Console.WriteLine("  generate-fallback --wasm module.wasm --out candidate.js --validator path --wasm2js path --esbuild path [--global WasmBridgeGeneratedCandidate]");

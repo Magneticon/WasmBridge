@@ -1,5 +1,5 @@
 /*
- * WasmBridge 0.1: readable classic-script loader for Firefox 52 ESR and modern browsers.
+ * WasmBridge 0.6: readable classic-script loader for Firefox 52 ESR and modern browsers.
  * No ES modules, streaming API, SIMD, threads or worker/DOM assumptions for Wasm itself.
  * Script-URL fallback loading requires a document and trusted same-origin input.
  */
@@ -19,10 +19,19 @@
         }
     }
 
-    function publicAdapter(backend, exportsObject, names, diagnostic, instance) {
+    function failure(phase, error) {
+        var message = error && error.message ? error.message : String(error);
+        var result = new Error(message);
+        result.wasmBridgePhase = phase;
+        return result;
+    }
+
+    function publicAdapter(backend, exportsObject, names, diagnostic, instance, failureInfo) {
         var adapter = {
             backend: backend,
             diagnostic: diagnostic || "",
+            failurePhase: failureInfo ? failureInfo.phase : null,
+            wasmFailure: failureInfo || null,
             instance: instance || null,
             exports: exportsObject
         };
@@ -71,35 +80,44 @@
     function useWasm(options, names) {
         if (typeof WebAssembly === "undefined" ||
             typeof WebAssembly.instantiate !== "function") {
-            return Promise.reject(new Error("WebAssembly is unavailable."));
+            return Promise.reject(failure("unavailable", "WebAssembly is unavailable."));
         }
         if (typeof options.wasm !== "string" || !options.wasm) {
-            return Promise.reject(new Error("A WASM URL is required."));
+            return Promise.reject(failure("configuration", "A WASM URL is required."));
         }
         var bytes;
         if (typeof fetch === "function") {
             bytes = fetch(options.wasm).then(function (response) {
-                if (!response.ok) throw new Error("WASM HTTP status " + response.status);
+                if (!response.ok) throw failure("load", "WASM HTTP status " + response.status);
                 return response.arrayBuffer();
+            }).catch(function (error) {
+                if (error && error.wasmBridgePhase) throw error;
+                throw failure("load", error);
             });
         } else if (root.WasmBridgeCompat &&
                    typeof root.WasmBridgeCompat.loadBytes === "function") {
             // Optional XHR ponyfill: include legacy-compat.js before wasmbridge.js.
-            bytes = root.WasmBridgeCompat.loadBytes(options.wasm);
+            bytes = root.WasmBridgeCompat.loadBytes(options.wasm).catch(function (error) {
+                throw failure("load", error);
+            });
         } else {
-            return Promise.reject(new Error("Fetch is unavailable; include legacy-compat.js for XHR loading."));
+            return Promise.reject(failure("load", "Fetch is unavailable; include legacy-compat.js for XHR loading."));
         }
         return bytes.then(function (buffer) {
-            return WebAssembly.instantiate(new Uint8Array(buffer), options.imports || {});
+            return WebAssembly.instantiate(new Uint8Array(buffer), options.imports || {}).catch(function (error) {
+                throw failure("instantiate", error);
+            });
         }).then(function (result) {
             var instance = result.instance || result;
-            checkExports(instance.exports, names);
+            try { checkExports(instance.exports, names); }
+            catch (exportError) { throw failure("exports", exportError); }
             // Allow adapters to reject an unusable WASM ABI before backend selection.
             // A failed check falls through to the caller's matching JS fallback.
             if (typeof options.validateWasm === "function") {
-                options.validateWasm(instance.exports, instance);
+                try { options.validateWasm(instance.exports, instance); }
+                catch (abiError) { throw failure("abi", abiError); }
             }
-            return publicAdapter("wasm", instance.exports, names, "", instance);
+            return publicAdapter("wasm", instance.exports, names, "", instance, null);
         });
     }
 
@@ -110,20 +128,25 @@
             return Promise.reject(new Error("exports must be a non-empty array."));
         }
         function fallback(reason) {
+            var phase = reason && reason.wasmBridgePhase ? reason.wasmBridgePhase : "unknown";
+            var message = reason && reason.message ? reason.message : String(reason);
+            var failureInfo = {phase: phase, message: message};
             return getScriptFallback(options).then(function (implementation) {
                 checkExports(implementation, names);
-                return publicAdapter("javascript", implementation, names, String(reason), null);
+                return publicAdapter("javascript", implementation, names,
+                    "[" + phase + "] " + message, null, failureInfo);
             }, function (fallbackError) {
-                throw new Error("WASM: " + reason + "; fallback: " + fallbackError.message);
+                throw new Error("WASM [" + phase + "]: " + message +
+                    "; fallback: " + fallbackError.message);
             });
         }
         if (options.preferWasm === false) {
-            return fallback("WASM disabled by caller.");
+            return fallback(failure("disabled", "WASM disabled by caller."));
         }
         return useWasm(options, names).catch(function (wasmError) {
-            return fallback(wasmError && wasmError.message ? wasmError.message : wasmError);
+            return fallback(wasmError);
         });
     }
 
-    root.WasmBridge = { load: load, version: "0.4.0" };
+    root.WasmBridge = { load: load, version: "0.6.0" };
 }(this));

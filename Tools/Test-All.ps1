@@ -93,6 +93,7 @@ try {
         if ($server.HasExited) { throw "Example server exited before browser tests." }
 
         $pages = @(
+            "Examples/WasmSelfTest/index.html",
             "Examples/HelloWorld/index.html",
             "Examples/HelloWorld/index.html?fallback=1",
             "Examples/EmscriptenHelloWorld/index.html",

@@ -5,6 +5,11 @@ WasmBridge 0.7. Runtime files are classic scripts and are compatible with the
 Firefox 52.9 ESR baseline. Load scripts in the order shown; every operation is
 asynchronous at module load time and synchronous after a module is returned.
 
+For the full programming model, source-language porting guidance (JavaScript,
+C, C++, C#), ABI design, memory ownership, packaging workflow, validation,
+Firefox 52 deployment, and troubleshooting, read
+[PROGRAMMING_GUIDE.md](PROGRAMMING_GUIDE.md).
+
 ## Low-level loader: `WasmBridge`
 
 ```html

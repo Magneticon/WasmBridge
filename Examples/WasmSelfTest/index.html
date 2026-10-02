@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PENDING - WasmBridge native WASM self-test</title>
+<style>
+body { font: 14px Arial, sans-serif; max-width: 880px; margin: 24px auto; padding: 0 16px; color: #222; }
+h1 { font-size: 22px; }
+pre { white-space: pre-wrap; border: 1px solid #999; background: #f7f7f7; padding: 12px; line-height: 1.4; }
+</style>
+</head>
+<body>
+<h1>WasmBridge native WebAssembly self-test</h1>
+<p>This page deliberately bypasses all WasmBridge JavaScript adapters and fallbacks. It tests the shipped
+<code>.wasm</code> files directly using Firefox's native WebAssembly implementation.</p>
+<pre id="result">PENDING: loading native WebAssembly modules...</pre>
+<script>
+(function () {
+    "use strict";
+    var result = document.getElementById("result");
+    var notes = [];
+
+    function assert(condition, message) {
+        if (!condition) throw new Error(message);
+    }
+
+    function same(actual, expected, message) {
+        assert(actual.length === expected.length, message + " (length)");
+        for (var i = 0; i < expected.length; ++i)
+            if (actual[i] !== expected[i]) throw new Error(message + " at byte " + i);
+    }
+
+    function bytes(memory, pointer, count) {
+        var source = new Uint8Array(memory.buffer, pointer, count);
+        var copy = [];
+        for (var i = 0; i < source.length; ++i) copy.push(source[i]);
+        return copy;
+    }
+
+    function load(url) {
+        return fetch(url).then(function (response) {
+            if (!response.ok) throw new Error("HTTP " + response.status + " for " + url);
+            return response.arrayBuffer();
+        }).then(function (buffer) {
+            return WebAssembly.instantiate(new Uint8Array(buffer), {});
+        }).then(function (loaded) {
+            return loaded.instance || loaded;
+        });
+    }
+
+    function testHelloWorld() {
+        return load("../HelloWorld/add.wasm").then(function (instance) {
+            assert(typeof instance.exports.add === "function", "HelloWorld add export missing");
+            assert(instance.exports.add(20, 22) === 42, "HelloWorld add(20,22) failed");
+            assert(instance.exports.add(-10, 3) === -7, "HelloWorld signed i32 add failed");
+            assert(instance.exports.add(2147483647, 1) === -2147483648, "HelloWorld i32 wrap failed");
+            notes.push("HelloWorld raw add/i32 semantics: PASS");
+        });
+    }
+
+    function testEmscripten() {
+        return load("../EmscriptenHelloWorld/add.wasm").then(function (instance) {
+            assert(instance.exports.memory && instance.exports.memory.buffer,
+                "Emscripten fixture did not export memory");
+            assert(typeof instance.exports.add === "function", "Emscripten add export missing");
+            assert(instance.exports.add(123, -23) === 100, "Emscripten add failed");
+            notes.push("Emscripten standalone WASM ABI: PASS");
+        });
+    }
+
+    function testRgba() {
+        return load("../ImageProcessing/rgba.wasm").then(function (instance) {
+            var api = instance.exports;
+            assert(api.memory && api.memory.buffer, "RGBA memory export missing");
+            assert(typeof api.wb_rgba_buffer === "function", "wb_rgba_buffer missing");
+            assert(typeof api.wb_rgba_capacity === "function", "wb_rgba_capacity missing");
+            assert(typeof api.wb_rgba_invert === "function", "wb_rgba_invert missing");
+            var pointer = api.wb_rgba_buffer();
+            var capacity = api.wb_rgba_capacity();
+            assert(capacity === 512 * 512 * 4, "RGBA capacity mismatch");
+            assert(pointer > 0 && pointer + capacity <= api.memory.buffer.byteLength,
+                "RGBA buffer lies outside memory");
+            var input = [1,2,3,4,20,40,80,160,255,128,0,33,9,10,11,12];
+            new Uint8Array(api.memory.buffer).set(input, pointer);
+            assert(api.wb_rgba_invert(2, 2) === 16, "RGBA 2x2 call failed");
+            same(bytes(api.memory, pointer, 16),
+                [254,253,252,4,235,215,175,160,0,127,255,33,246,245,244,12],
+                "RGBA inversion mismatch");
+            assert(api.wb_rgba_invert(2, 2) === 16, "RGBA second inversion failed");
+            same(bytes(api.memory, pointer, 16), input, "RGBA double inversion did not restore input");
+            assert(api.wb_rgba_invert(0, 1) === -1, "RGBA accepted width 0");
+            assert(api.wb_rgba_invert(513, 1) === -1, "RGBA accepted width 513");
+            notes.push("RGBA raw memory/export/bounds/alpha behavior: PASS");
+        });
+    }
+
+    function testBuffers() {
+        return load("../BufferArena/buffers.wasm").then(function (instance) {
+            var api = instance.exports;
+            assert(api.memory && api.memory.buffer, "BufferArena memory export missing");
+            assert(typeof api.wb_alloc === "function" && typeof api.wb_free === "function",
+                "BufferArena allocator exports missing");
+            assert(typeof api.wb_capacity === "function" && typeof api.wb_active_count === "function",
+                "BufferArena allocator metadata exports missing");
+            assert(typeof api.wb_invert_rgba === "function", "BufferArena processing export missing");
+            assert(api.wb_active_count() === 0, "BufferArena did not start empty");
+            assert(api.wb_alloc(0) === 0, "BufferArena accepted zero-byte allocation");
+
+            var source = api.wb_alloc(8);
+            var destination = api.wb_alloc(8);
+            assert(source > 0 && destination > 0 && source !== destination, "Independent allocations failed");
+            assert((source & 7) === 0 && (destination & 7) === 0, "Allocator alignment failed");
+            assert(api.wb_capacity(source) >= 8 && api.wb_capacity(destination) >= 8,
+                "Allocator capacity failed");
+            new Uint8Array(api.memory.buffer, source, 8).set([12,100,200,9,0,255,127,77]);
+            assert(api.wb_invert_rgba(source, destination, 8) === 8, "Separate-buffer inversion failed");
+            same(bytes(api.memory, destination, 8), [243,155,55,9,255,0,128,77],
+                "Separate-buffer output mismatch");
+            same(bytes(api.memory, source, 8), [12,100,200,9,0,255,127,77],
+                "Separate-buffer processing changed source");
+            assert(api.wb_invert_rgba(source, destination, 7) === -1, "Non-RGBA byte count accepted");
+
+            var retained = api.wb_alloc(64);
+            new Uint8Array(api.memory.buffer, retained, 4).set([9,8,7,6]);
+            var before = api.memory.buffer.byteLength;
+            api.memory.grow(1);
+            assert(api.memory.buffer.byteLength === before + 65536, "memory.grow page size mismatch");
+            same(bytes(api.memory, retained, 4), [9,8,7,6], "allocation data lost across memory.grow");
+
+            assert(api.wb_free(retained) === 1, "retained buffer free failed");
+            assert(api.wb_free(destination) === 1, "destination free failed");
+            assert(api.wb_free(source) === 1, "source free failed");
+            assert(api.wb_free(source) === 0, "double free was accepted");
+            assert(api.wb_active_count() === 0, "BufferArena leaked allocations");
+            notes.push("BufferArena raw allocator/memory.grow/processing: PASS");
+        });
+    }
+
+    function testDescriptorLimit() {
+        return load("../BufferArena/buffers.wasm").then(function (instance) {
+            var api = instance.exports;
+            var pointers = [], i, pointer;
+            for (i = 0; i < 128; ++i) {
+                pointer = api.wb_alloc(8);
+                assert(pointer > 0, "Descriptor allocation failed at slot " + i);
+                pointers.push(pointer);
+            }
+            assert(api.wb_active_count() === 128, "Descriptor count did not reach 128");
+            assert(api.wb_alloc(8) === 0, "129th descriptor was accepted");
+            pointer = pointers[64];
+            assert(api.wb_free(pointer) === 1, "Middle descriptor free failed");
+            assert(api.wb_alloc(8) === pointer, "Released exact-size block was not reused");
+            for (i = 0; i < pointers.length; ++i)
+                assert(api.wb_free(pointers[i]) === 1, "Descriptor cleanup failed at " + i);
+            assert(api.wb_active_count() === 0, "Descriptor stress test leaked blocks");
+            notes.push("128-descriptor limit and first-fit reuse: PASS");
+        });
+    }
+
+    function testCorruptModule() {
+        var broken = new Uint8Array([0,97,115,109,1,0,0,0,255]);
+        return WebAssembly.instantiate(broken, {}).then(function () {
+            throw new Error("Malformed WASM unexpectedly instantiated");
+        }, function () {
+            notes.push("Malformed WASM rejection: PASS");
+        });
+    }
+
+    if (typeof WebAssembly === "undefined" || typeof WebAssembly.instantiate !== "function") {
+        result.textContent = "FAIL: native WebAssembly is unavailable.";
+        document.title = "FAIL - WasmBridge native WASM self-test";
+        return;
+    }
+
+    testHelloWorld()
+        .then(testEmscripten)
+        .then(testRgba)
+        .then(testBuffers)
+        .then(testDescriptorLimit)
+        .then(testCorruptModule)
+        .then(function () {
+            result.textContent = "PASS\n" + notes.join("\n") + "\nBrowser: " + navigator.userAgent;
+            document.title = "PASS - WasmBridge native WASM self-test";
+        }, function (error) {
+            result.textContent = "FAIL: " + error.message + "\n" + notes.join("\n") +
+                "\nBrowser: " + navigator.userAgent;
+            document.title = "FAIL - WasmBridge native WASM self-test";
+        });
+}());
+</script>
+</body>
+</html>

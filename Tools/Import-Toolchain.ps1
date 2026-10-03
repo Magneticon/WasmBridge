@@ -83,7 +83,7 @@ foreach ($relative in $requiredDirectories) {
 if ($preservedReadme -ne $null) {
     [IO.File]::WriteAllText($readme, $preservedReadme, (New-Object Text.UTF8Encoding($false)))
 }
-elif (-not (Test-Path -LiteralPath $readme)) {
+elseif (-not (Test-Path -LiteralPath $readme)) {
     @'
 # WasmBridge bundled toolchain
 

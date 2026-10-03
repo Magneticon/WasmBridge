@@ -18,17 +18,17 @@ namespace WasmBridge.CLI
                 {
                     RejectUnknown(p, "source,out,clang,export,timeout,address-bits");
                     CompileOptions o = new CompileOptions(); o.SourceFile=Required(p,"source"); o.OutputFile=Required(p,"out");
-                    if(p.ContainsKey("clang"))o.ClangPath=p["clang"]; if(p.ContainsKey("export"))o.ExportName=p["export"]; if(p.ContainsKey("timeout"))o.TimeoutMilliseconds=Int32.Parse(p["timeout"]); if(p.ContainsKey("address-bits"))o.AddressBits=ParseAddressBits(p["address-bits"]);
+                    o.ClangPath=p.ContainsKey("clang")?p["clang"]:BundledOrCommand("emsdk\\upstream\\bin\\clang.exe","clang"); if(p.ContainsKey("export"))o.ExportName=p["export"]; if(p.ContainsKey("timeout"))o.TimeoutMilliseconds=Int32.Parse(p["timeout"]); if(p.ContainsKey("address-bits"))o.AddressBits=ParseAddressBits(p["address-bits"]);
                     CompileResult r=WasmCompiler.CompileC(o); Console.WriteLine("Built "+r.OutputFile+" (wasm"+o.AddressBits+")"); return 0;
                 }
                 if (command == "build-emscripten")
                 {
                     RejectUnknown(p,"source,sources,out,emcc,export,include,define,timeout,address-bits");
-                    EmscriptenCompileOptions o=new EmscriptenCompileOptions(); if(!p.ContainsKey("source")&&!p.ContainsKey("sources"))throw new ArgumentException("Missing --source or --sources"); if(p.ContainsKey("source"))o.SourceFile=p["source"]; if(p.ContainsKey("sources"))o.SourceFiles=SplitList(p["sources"]); o.OutputFile=Required(p,"out"); if(p.ContainsKey("emcc"))o.EmccPath=p["emcc"]; if(p.ContainsKey("export"))o.ExportName=p["export"]; if(p.ContainsKey("include"))o.IncludeDirectories=SplitList(p["include"]); if(p.ContainsKey("define"))o.Defines=SplitList(p["define"]); if(p.ContainsKey("timeout"))o.TimeoutMilliseconds=Int32.Parse(p["timeout"]); if(p.ContainsKey("address-bits"))o.AddressBits=ParseAddressBits(p["address-bits"]); WasmCompiler.CompileEmscriptenC(o); Console.WriteLine("Built standalone Emscripten wasm"+o.AddressBits+" module "+Path.GetFullPath(o.OutputFile)); return 0;
+                    EmscriptenCompileOptions o=new EmscriptenCompileOptions(); if(!p.ContainsKey("source")&&!p.ContainsKey("sources"))throw new ArgumentException("Missing --source or --sources"); if(p.ContainsKey("source"))o.SourceFile=p["source"]; if(p.ContainsKey("sources"))o.SourceFiles=SplitList(p["sources"]); o.OutputFile=Required(p,"out"); o.EmccPath=p.ContainsKey("emcc")?p["emcc"]:BundledOrCommand("emsdk\\upstream\\emscripten\\emcc.exe","emcc"); if(p.ContainsKey("export"))o.ExportName=p["export"]; if(p.ContainsKey("include"))o.IncludeDirectories=SplitList(p["include"]); if(p.ContainsKey("define"))o.Defines=SplitList(p["define"]); if(p.ContainsKey("timeout"))o.TimeoutMilliseconds=Int32.Parse(p["timeout"]); if(p.ContainsKey("address-bits"))o.AddressBits=ParseAddressBits(p["address-bits"]); WasmCompiler.CompileEmscriptenC(o); Console.WriteLine("Built standalone Emscripten wasm"+o.AddressBits+" module "+Path.GetFullPath(o.OutputFile)); return 0;
                 }
-                if(command=="validate-legacy") { RejectUnknown(p,"wasm,validator"); ExternalToolchain.ValidateLegacy(Required(p,"wasm"),Required(p,"validator")); Console.WriteLine("PASS: restricted Firefox-52/MVP wasm32 profile validated."); return 0; }
-                if(command=="generate-fallback") { RejectUnknown(p,"wasm,out,wasm2js,esbuild,validator,global"); ExternalToolchain.GenerateFallback(Required(p,"wasm"),Required(p,"out"),Required(p,"wasm2js"),Required(p,"esbuild"),Required(p,"validator"),p.ContainsKey("global")?p["global"]:"WasmBridgeGeneratedCandidate"); Console.WriteLine("Generated classic-script candidate: "+Path.GetFullPath(p["out"])); return 0; }
-                if(command=="optimize-legacy") { RejectUnknown(p,"wasm,out,optimizer,validator"); ExternalToolchain.OptimizeLegacy(Required(p,"wasm"),Required(p,"out"),Required(p,"optimizer"),Required(p,"validator")); Console.WriteLine("PASS: optimized legacy Wasm validated."); return 0; }
+                if(command=="validate-legacy") { RejectUnknown(p,"wasm,validator"); string validator=p.ContainsKey("validator")?p["validator"]:BundledRequired("wabt-1.0.42\\bin\\wasm-validate.exe"); ExternalToolchain.ValidateLegacy(Required(p,"wasm"),validator); Console.WriteLine("PASS: restricted Firefox-52/MVP wasm32 profile validated."); return 0; }
+                if(command=="generate-fallback") { RejectUnknown(p,"wasm,out,wasm2js,esbuild,validator,global"); string validator=p.ContainsKey("validator")?p["validator"]:BundledRequired("wabt-1.0.42\\bin\\wasm-validate.exe"); string wasm2js=p.ContainsKey("wasm2js")?p["wasm2js"]:BundledRequired("binaryen-version_133\\bin\\wasm2js.exe"); string esbuild=p.ContainsKey("esbuild")?p["esbuild"]:BundledRequired("esbuild-0.28.2\\esbuild.exe"); ExternalToolchain.GenerateFallback(Required(p,"wasm"),Required(p,"out"),wasm2js,esbuild,validator,p.ContainsKey("global")?p["global"]:"WasmBridgeGeneratedCandidate"); Console.WriteLine("Generated classic-script candidate: "+Path.GetFullPath(p["out"])); return 0; }
+                if(command=="optimize-legacy") { RejectUnknown(p,"wasm,out,optimizer,validator"); string optimizer=p.ContainsKey("optimizer")?p["optimizer"]:BundledRequired("binaryen-version_133\\bin\\wasm-opt.exe"); string validator=p.ContainsKey("validator")?p["validator"]:BundledRequired("wabt-1.0.42\\bin\\wasm-validate.exe"); ExternalToolchain.OptimizeLegacy(Required(p,"wasm"),Required(p,"out"),optimizer,validator); Console.WriteLine("PASS: optimized legacy Wasm validated."); return 0; }
                 if(command=="package")
                 {
                     RejectUnknown(p,"wasm,fallback,runtime,adapter,module-runtime,out,export,allocator,memory-export,fallback-global,signatures");
@@ -64,11 +64,30 @@ namespace WasmBridge.CLI
             IntPtr src=IntPtr.Zero,dst=IntPtr.Zero;try{src=wb_alloc(8);dst=wb_alloc(8);if(src==IntPtr.Zero||dst==IntPtr.Zero||wb_capacity(src)<8)throw new InvalidOperationException("Native allocation failed.");byte[] input={1,2,3,4,200,100,0,128},actual=new byte[8];Marshal.Copy(input,0,src,8);if(wb_invert_rgba(src,dst,8)!=8)throw new InvalidOperationException("Native invert failed.");Marshal.Copy(dst,actual,0,8);if(actual[0]!=254||actual[3]!=4)throw new InvalidOperationException("Native buffer output mismatch.");}finally{if(dst!=IntPtr.Zero)wb_free(dst);if(src!=IntPtr.Zero)wb_free(src);}if(wb_active_count()!=0)throw new InvalidOperationException("Native allocator leaked buffers.");
         }
 
+        private static string FindBundledTool(string relative)
+        {
+            DirectoryInfo dir=new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            for(int i=0;i<8&&dir!=null;i++,dir=dir.Parent)
+            {
+                string candidate=Path.Combine(Path.Combine(dir.FullName,"Toolchain"),relative);
+                if(File.Exists(candidate))return candidate;
+            }
+            string env=Environment.GetEnvironmentVariable("WASMBRIDGE_TOOLS");
+            if(!String.IsNullOrEmpty(env))
+            {
+                string candidate=Path.Combine(env,relative);
+                if(File.Exists(candidate))return candidate;
+            }
+            return null;
+        }
+        private static string BundledRequired(string relative){string p=FindBundledTool(relative);if(String.IsNullOrEmpty(p))throw new FileNotFoundException("Bundled WasmBridge tool not found: Toolchain\\"+relative+". Run Tools\\Import-Toolchain.ps1 or supply the explicit tool option.");return p;}
+        private static string BundledOrCommand(string relative,string command){string p=FindBundledTool(relative);return String.IsNullOrEmpty(p)?command:p;}
+
         private static Dictionary<string,string> Parse(string[] args){Dictionary<string,string> v=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);for(int i=1;i<args.Length;i+=2){if(!args[i].StartsWith("--")||i+1==args.Length)throw new ArgumentException("Expected --key value pairs.");string k=args[i].Substring(2);if(v.ContainsKey(k))throw new ArgumentException("Duplicate option: "+k);v[k]=args[i+1];}return v;}
         private static void RejectUnknown(Dictionary<string,string> p,string allowedText){HashSet<string> allowed=new HashSet<string>((allowedText??"").Split(new[]{','},StringSplitOptions.RemoveEmptyEntries),StringComparer.OrdinalIgnoreCase);foreach(string k in p.Keys)if(!allowed.Contains(k))throw new ArgumentException("Unknown option: --"+k);}
         private static string Required(Dictionary<string,string> p,string key){string v;if(!p.TryGetValue(key,out v)||String.IsNullOrEmpty(v))throw new ArgumentException("Missing --"+key);return v;}
         private static string[] SplitList(string value){string[] p=(value??"").Split(new[]{';'},StringSplitOptions.RemoveEmptyEntries);if(p.Length==0)throw new ArgumentException("List option cannot be empty.");return p;}
         private static int ParseAddressBits(string value){int n;if(!Int32.TryParse(value,out n)||(n!=32&&n!=64))throw new ArgumentException("--address-bits must be 32 or 64.");return n;}
-        private static void Help(){Console.WriteLine("WasmBridge 0.8.0 - XP-compatible Wasm build/packaging frontend");Console.WriteLine("  build --source file.c --out module.wasm [--address-bits 32|64] [--export name]");Console.WriteLine("  build-emscripten --source file.c --out module.wasm [--address-bits 32|64]");Console.WriteLine("  package --wasm module.wasm --fallback fallback.js --runtime Runtime\\wasmbridge.js --out dist");Console.WriteLine("  verify --wasm module.wasm | verify-package --manifest dist\\manifest.json | self-test");Console.WriteLine("  validate-legacy / generate-fallback / optimize-legacy remain Firefox-52 wasm32 tools.");Console.WriteLine("memory64/wasm64 requires a modern engine; Firefox 52 remains wasm32.");}
+        private static void Help(){Console.WriteLine("WasmBridge 0.8.0 - XP-compatible Wasm build/packaging frontend");Console.WriteLine("Bundled Toolchain\\ dependencies are auto-discovered; explicit tool options remain overrides.");Console.WriteLine("  build --source file.c --out module.wasm [--address-bits 32|64] [--export name]");Console.WriteLine("  build-emscripten --source file.c --out module.wasm [--address-bits 32|64]");Console.WriteLine("  package --wasm module.wasm --fallback fallback.js --runtime Runtime\\wasmbridge.js --out dist");Console.WriteLine("  verify --wasm module.wasm | verify-package --manifest dist\\manifest.json | self-test");Console.WriteLine("  validate-legacy / generate-fallback / optimize-legacy remain Firefox-52 wasm32 tools.");Console.WriteLine("memory64/wasm64 requires a modern engine; Firefox 52 remains wasm32.");}
     }
 }

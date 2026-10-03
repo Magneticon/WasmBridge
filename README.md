@@ -13,6 +13,31 @@ The runtime is address-width aware:
 
 Browser-process bitness and Wasm address width are separate properties. A 64-bit browser can still run wasm32.
 
+## Self-contained SDK/toolchain
+
+WasmBridge is designed to be a self-contained SDK tree. Pinned host-side dependencies live under `Toolchain\` instead of requiring a machine-specific `C:\CODEX\TOOLS\WasmBridge` installation.
+
+Expected bundled layout:
+
+```text
+Toolchain\
+  binaryen-version_133\
+  emsdk\
+  esbuild-0.28.2\
+  Firefox52-TestProfile\
+  wabt-1.0.42\
+```
+
+If you already have the prepared toolset elsewhere, import it once:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File Tools\Import-Toolchain.ps1 -Source E:\GPT\CODEX\CODEX\DATA\WasmBridge -Clean
+```
+
+After import, normal build/test scripts automatically use `Toolchain\`. `WASMBRIDGE_TOOLS`, `WASMBRIDGE_LLVM`, `-ToolRoot` and related switches remain explicit overrides only.
+
+The Windows XP runtime machine does not need Node, LLVM, Emscripten, WABT, Binaryen or esbuild; those are host-side SDK components.
+
 ## Build targets
 
 Windows binaries remain XP-compatible:
@@ -22,7 +47,7 @@ Windows binaries remain XP-compatible:
 - .NET Framework 4.0
 - x86 and x64 native/managed builds
 
-WebAssembly compilation happens on the development host using external Clang/wasm-ld or Emscripten. Windows XP does not need Node, LLVM, Emscripten, WABT or Binaryen to consume the browser assets.
+The bundled `emsdk\upstream` LLVM is also used as the default direct Clang/wasm-ld toolchain when present.
 
 ## CLI examples
 
@@ -69,6 +94,8 @@ Run the complete host/browser matrix with:
 powershell -ExecutionPolicy Bypass -File Tools\Test-All.ps1
 ```
 
+For a Windows 10 host that does not contain Firefox 52, run the host matrix with `-SkipFirefox`, then perform the browser acceptance test on XP.
+
 For the XP browser over the LAN, run on the Windows 10 host:
 
 ```text
@@ -81,7 +108,7 @@ and open on XP:
 http://192.168.255.2:8084/Examples/WasmSelfTest/index.html
 ```
 
-The native self-test now verifies wasm32 addressing, growth beyond the former 32 MiB ceiling and more than 128 simultaneous allocations.
+The native self-test verifies wasm32 addressing, growth beyond the former 32 MiB ceiling and more than 128 simultaneous allocations.
 
 ## Documentation
 
@@ -91,3 +118,4 @@ The native self-test now verifies wasm32 addressing, growth beyond the former 32
 - [`Documentation/FF52_COMPATIBILITY.md`](Documentation/FF52_COMPATIBILITY.md) — Firefox 52 syntax/toolchain profile.
 - [`Documentation/GETTING_STARTED.md`](Documentation/GETTING_STARTED.md) — setup and first module.
 - [`Documentation/XP_FIREFOX_TEST_ENDPOINT.md`](Documentation/XP_FIREFOX_TEST_ENDPOINT.md) — standard XP LAN test endpoint.
+- [`Toolchain/README.md`](Toolchain/README.md) — bundled toolchain layout and policy.

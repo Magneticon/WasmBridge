@@ -50,6 +50,12 @@ foreach ($relative in $requiredFiles) {
     }
 }
 
+$readme = Join-Path $Destination "README.md"
+$preservedReadme = $null
+if (Test-Path -LiteralPath $readme -PathType Leaf) {
+    $preservedReadme = Get-Content -LiteralPath $readme -Raw
+}
+
 if ($Clean -and (Test-Path -LiteralPath $Destination)) {
     $resolvedDestination = [IO.Path]::GetFullPath($Destination)
     $resolvedRepo = [IO.Path]::GetFullPath($repo)
@@ -74,13 +80,14 @@ foreach ($relative in $requiredDirectories) {
     }
 }
 
-# Ensure the repository's own documentation survives a clean import.
-$readme = Join-Path $Destination "README.md"
-if (-not (Test-Path -LiteralPath $readme)) {
+if ($preservedReadme -ne $null) {
+    [IO.File]::WriteAllText($readme, $preservedReadme, (New-Object Text.UTF8Encoding($false)))
+}
+elif (-not (Test-Path -LiteralPath $readme)) {
     @'
 # WasmBridge bundled toolchain
 
-This directory contains the pinned host-side dependencies used to build and validate WasmBridge. See the repository `Toolchain/README.md` in source control for details.
+This directory contains the pinned host-side dependencies used to build and validate WasmBridge.
 '@ | Set-Content -LiteralPath $readme -Encoding UTF8
 }
 

@@ -7,13 +7,36 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $cli = Join-Path $repoRoot 'bin\Release\WXP\x64\WasmBridge.exe'
 $input = Join-Path $repoRoot 'Examples\BufferArena\buffers.wasm'
-$validator = Join-Path $ToolRoot 'wabt-1.0.42\bin\wasm-validate.exe'
-$optimizer = Join-Path $ToolRoot 'binaryen-version_133\bin\wasm-opt.exe'
-$wasm2js = Join-Path $ToolRoot 'binaryen-version_133\bin\wasm2js.exe'
-$esbuild = Join-Path $ToolRoot 'esbuild-0.28.2\esbuild.exe'
-foreach ($file in @($cli,$input,$validator,$optimizer,$wasm2js,$esbuild)) {
-    if (-not (Test-Path -LiteralPath $file)) { throw "Required file not found: $file" }
+
+function Resolve-WasmBridgeTool([string]$Name, [string]$RelativePath) {
+    $command = Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($command) { return $command.Source }
+    $portable = Join-Path $ToolRoot $RelativePath
+    if (Test-Path -LiteralPath $portable) { return $portable }
+    return $null
 }
+
+$validator = Resolve-WasmBridgeTool 'wasm-validate.exe' 'wabt-1.0.42\bin\wasm-validate.exe'
+$optimizer = Resolve-WasmBridgeTool 'wasm-opt.exe' 'binaryen-version_133\bin\wasm-opt.exe'
+$wasm2js = Resolve-WasmBridgeTool 'wasm2js.exe' 'binaryen-version_133\bin\wasm2js.exe'
+$esbuild = Resolve-WasmBridgeTool 'esbuild.exe' 'esbuild-0.28.2\esbuild.exe'
+
+foreach ($file in @($cli,$input)) {
+    if (-not (Test-Path -LiteralPath $file)) { throw "Required WasmBridge file not found: $file" }
+}
+
+$missing = @()
+if (-not $validator) { $missing += 'wasm-validate.exe' }
+if (-not $optimizer) { $missing += 'wasm-opt.exe' }
+if (-not $wasm2js) { $missing += 'wasm2js.exe' }
+if (-not $esbuild) { $missing += 'esbuild.exe' }
+if ($missing.Count -ne 0) {
+    Write-Host ("SKIP: optional external toolchain is not installed/discoverable: " + ($missing -join ', ') +
+        ". Add the tools to PATH or set WASMBRIDGE_TOOLS / -ToolRoot.")
+    $global:LASTEXITCODE = 0
+    return
+}
+
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $optimized = Join-Path $OutputDirectory 'buffers-optimized.wasm'
 $candidate = Join-Path $OutputDirectory 'buffers-generated-candidate.js'
@@ -37,3 +60,4 @@ Write-Host ('Binaryen wasm-opt: ' + (& $optimizer --version))
 Write-Host ('Binaryen wasm2js: ' + (& $wasm2js --version))
 Write-Host ('esbuild: ' + (& $esbuild --version))
 Write-Host "PASS: external toolchain outputs and fresh generated-fallback parity are verified under $OutputDirectory"
+$global:LASTEXITCODE = 0

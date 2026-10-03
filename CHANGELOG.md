@@ -1,37 +1,25 @@
 # Changelog
 
+## 0.8.0 — 2026-10-02
+
+- Removed the framework-wide 16 MiB per-buffer, 32 MiB linear-memory and 128-allocation ceilings. Limits are now supplied only when an application explicitly configures quotas; otherwise allocation is bounded by the Wasm engine/browser/address space.
+- Replaced the fixed Wasm allocator descriptor table with dynamic in-memory block metadata, free-block splitting, adjacent coalescing and tail reclamation. Native metadata is dynamic as well.
+- Added `wb_address_bits()` and dual wasm32/memory64 runtime handling. wasm32 pointer results are normalized as unsigned values; memory64 pointers remain BigInt values on modern engines.
+- Added CLI `--address-bits 32|64` for Clang and Emscripten builds. Firefox 52 remains wasm32; `validate-legacy` continues to reject memory64.
+- Removed stale JavaScript handle-record accumulation and made `dispose()` retryable after backend release failures.
+- Made BufferArena cleanup attempt both source and destination releases even when one cleanup fails.
+- Fixed packaged adapter loading, synchronous instantiate failure classification, cross-realm RGBA typed arrays, malformed test-server URLs, v141_xp toolset discovery and native-only environment checks.
+- Unknown CLI options now fail instead of being silently ignored.
+- Added direct tests for >32 MiB memory, >128 live allocations, block splitting/coalescing, 2048×2048 RGBA, retryable disposal and optional memory64/BigInt operation.
+- Refreshed the programming/API/getting-started documentation for the new memory/addressing model.
+
 ## 0.7.0 — 2026-09-28
 
-- Added an optional `build-emscripten` backend that emits standalone Wasm for
-  the existing runtime, supports Windows `emcc.bat` launchers, declares C
-  exports explicitly, uses library-style `--no-entry` linking, and disables
-  known post-MVP instruction families.
-- Added a build-host contract test for Emscripten invocation, output/header
-  verification and invalid export rejection. WABT validation and Firefox 52
-  execution remain mandatory before an Emscripten-built module is shipped.
-- Added a reproducible Emscripten 6.0.10 HelloWorld fixture and a dedicated
-  Firefox 52 acceptance page that requires the native Wasm backend.
-- Made the isolated Firefox acceptance profile explicitly enable WebAssembly,
-  preventing intended Wasm cases from passing silently through JS fallback.
-- Extended the Emscripten command to compile multiple C/C++ sources with
-  include directories and preprocessor definitions, including robust Windows
-  batch-launcher quoting for paths containing spaces.
+- Added optional standalone Emscripten C/C++ compilation, reproducible fixture tests and Firefox 52 acceptance.
+- Added multi-source/include/define support and robust Windows batch-launcher handling.
 
 ## 0.6.0 — 2026-09-28
 
-- Added a Firefox 52-compatible general multi-module runtime with owned byte,
-  typed-array and UTF-8 buffers, scoped cleanup, disposal, imports, configurable
-  limits, structured fallback diagnostics and typed function contracts.
-- Added manifest-driven v0.2 package loading and strict offline package
-  verification with containment, artifact, hash, schema and Wasm-header checks.
-- Added WABT, Binaryen and esbuild host-toolchain integration plus a recorded,
-  hash-checked generated BufferArena fallback candidate.
-- Hardened the bounded Wasm/JavaScript allocator with adjacent-block coalescing,
-  free-tail reclamation and allocation-churn tests.
-- Added reproducible x86/x64 build helpers and a complete validation matrix for
-  native, managed, Node, package, toolchain and Firefox 52 Wasm/fallback paths.
-- Verified HelloWorld, ImageProcessing, BufferArena, generated fallback,
-  GeneralModule and PackageLoader acceptance pages in 32-bit Firefox 52.9 ESR.
+- Added the general multi-module runtime, package loading/verification, host toolchain integration and complete validation matrix.
 
-This is the first tagged WasmBridge development release. Windows outputs retain
-the XP-compatible `v141_xp` and .NET Framework 4.0 targets.
+Windows outputs retain the XP-compatible `v141_xp` and .NET Framework 4.0 targets.

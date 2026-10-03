@@ -1,75 +1,83 @@
-/* Same ABI as Core/buffers.c, intentionally readable and Firefox 52 compatible. */
+/* Same wasm32 ABI as Core/buffers.c, without artificial memory/slot ceilings. */
 (function (root) {
     "use strict";
-    var PAGE = 65536, LIMIT = 32 * 1024 * 1024, SLOTS = 128;
+    var PAGE = 65536, MAX_SAFE_INTEGER = 9007199254740991;
     var memory = { buffer: new ArrayBuffer(PAGE * 2) };
+
     memory.grow = function (pages) {
-        if (!Number.isInteger(pages) || pages < 0 || memory.buffer.byteLength + pages * PAGE > LIMIT)
-            throw new RangeError("JavaScript linear memory limit reached.");
+        if (typeof pages !== "number" || pages !== Math.floor(pages) || pages < 0)
+            throw new RangeError("JavaScript fallback memory growth must use a non-negative page count.");
         var previous = memory.buffer.byteLength / PAGE;
-        if (pages) {
-            var expanded = new ArrayBuffer(memory.buffer.byteLength + pages * PAGE);
-            new Uint8Array(expanded).set(new Uint8Array(memory.buffer));
-            memory.buffer = expanded;
-        }
+        if (!pages) return previous;
+        var growth = pages * PAGE;
+        if (growth > MAX_SAFE_INTEGER - memory.buffer.byteLength)
+            throw new RangeError("JavaScript fallback memory size overflow.");
+        var expanded = new ArrayBuffer(memory.buffer.byteLength + growth);
+        new Uint8Array(expanded).set(new Uint8Array(memory.buffer));
+        memory.buffer = expanded;
         return previous;
     };
+
     var blocks = [], next = 8192;
+
     function lookup(pointer) {
+        pointer = pointer >>> 0;
         for (var i = 0; i < blocks.length; ++i)
-            if (blocks[i] && blocks[i].pointer === pointer && blocks[i].active) return blocks[i];
+            if (blocks[i].pointer === pointer && blocks[i].active) return blocks[i];
         return null;
     }
+
     function coalesceAndTrim() {
-        var changed = true, i, j, a, b;
+        var changed = true, i, a, b;
+        blocks.sort(function (x, y) { return x.pointer - y.pointer; });
         while (changed) {
             changed = false;
-            for (i = 0; i < blocks.length && !changed; ++i) {
-                a = blocks[i];
-                if (!a || a.active) continue;
-                for (j = i + 1; j < blocks.length; ++j) {
-                    b = blocks[j];
-                    if (!b || b.active) continue;
-                    if (a.pointer + a.capacity === b.pointer) {
-                        a.capacity += b.capacity; blocks[j] = null; changed = true; break;
-                    }
-                    if (b.pointer + b.capacity === a.pointer) {
-                        b.capacity += a.capacity; blocks[i] = null; changed = true; break;
-                    }
+            for (i = 0; i + 1 < blocks.length; ++i) {
+                a = blocks[i]; b = blocks[i + 1];
+                if (!a.active && !b.active && a.pointer + a.capacity === b.pointer) {
+                    a.capacity += b.capacity;
+                    blocks.splice(i + 1, 1);
+                    changed = true;
+                    break;
                 }
             }
         }
-        changed = true;
-        while (changed) {
-            changed = false;
-            for (i = 0; i < blocks.length; ++i) {
-                a = blocks[i];
-                if (a && !a.active && a.pointer + a.capacity === next) {
-                    next = a.pointer; blocks[i] = null; changed = true; break;
-                }
-            }
+        while (blocks.length) {
+            a = blocks[blocks.length - 1];
+            if (a.active || a.pointer + a.capacity !== next) break;
+            next = a.pointer;
+            blocks.pop();
         }
     }
+
     function alloc(bytes) {
-        if (!Number.isInteger(bytes) || bytes <= 0 || bytes > LIMIT) return 0;
-        var size = (bytes + 7) & ~7;
-        var empty = -1;
+        if (typeof bytes !== "number" || bytes !== Math.floor(bytes) || bytes <= 0 || bytes > 4294967295)
+            return 0;
+        var size = Math.ceil(bytes / 8) * 8;
+        if (size > 4294967295) return 0;
         for (var i = 0; i < blocks.length; ++i) {
-            if (!blocks[i]) { if (empty < 0) empty = i; continue; }
-            if (!blocks[i].active && blocks[i].capacity >= size) {
-                blocks[i].active = true;
-                return blocks[i].pointer;
+            var block = blocks[i];
+            if (!block.active && block.capacity >= size) {
+                var remainder = block.capacity - size;
+                if (remainder >= 8) {
+                    blocks.splice(i + 1, 0, {pointer: block.pointer + size, capacity: remainder, active: false});
+                    block.capacity = size;
+                }
+                block.active = true;
+                return block.pointer;
             }
         }
-        if (empty < 0 && blocks.length < SLOTS) empty = blocks.length;
-        if (empty < 0 || next + size > LIMIT || next + size > memory.buffer.byteLength) return 0;
+        if (next > 4294967295 || size > 4294967296 - next || next + size > memory.buffer.byteLength)
+            return 0;
         var pointer = next;
         next += size;
-        blocks[empty] = {pointer: pointer, capacity: size, active: true};
+        blocks.push({pointer: pointer, capacity: size, active: true});
         return pointer;
     }
+
     root.WasmBridgeBuffersFallback = {
         memory: memory,
+        wb_address_bits: function () { return 32; },
         wb_alloc: alloc,
         wb_free: function (pointer) {
             var block = lookup(pointer);
@@ -84,13 +92,13 @@
         },
         wb_active_count: function () {
             var count = 0;
-            for (var i = 0; i < blocks.length; ++i) if (blocks[i] && blocks[i].active) ++count;
+            for (var i = 0; i < blocks.length; ++i) if (blocks[i].active) ++count;
             return count;
         },
         wb_invert_rgba: function (src, dst, bytes) {
             var a = lookup(src), b = lookup(dst);
-            if (!a || !b || !Number.isInteger(bytes) || bytes <= 0 ||
-                bytes % 4 || bytes > a.capacity || bytes > b.capacity) return -1;
+            if (!a || !b || typeof bytes !== "number" || bytes !== Math.floor(bytes) ||
+                bytes <= 0 || bytes % 4 || bytes > a.capacity || bytes > b.capacity) return -1;
             var data = new Uint8Array(memory.buffer);
             for (var i = 0; i < bytes; i += 4) {
                 data[dst + i] = 255 - data[src + i];

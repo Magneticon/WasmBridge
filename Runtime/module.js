@@ -1,10 +1,12 @@
-/* WasmBridge 0.6 general module API for Firefox 52 ESR and modern browsers.
- * Classic script only. Memory access always returns copies; no view survives
- * memory.grow or release. Allocator export names are module-configurable. */
+/* WasmBridge 0.8 general module API for Firefox 52 ESR and modern browsers.
+ * Classic script only. No arbitrary memory/allocation-count limits are imposed
+ * by default. wasm32 uses Number/i32 pointers; memory64 uses BigInt/i64 pointers
+ * when the host engine supports them. Memory access always returns copies. */
 (function (root) {
     "use strict";
 
     var PAGE = 65536;
+    var MAX_SAFE_INTEGER = 9007199254740991;
     var TYPES = {
         u8: Uint8Array, u8c: Uint8ClampedArray, i8: Int8Array,
         u16: Uint16Array, i16: Int16Array,
@@ -20,6 +22,12 @@
         if (typeof value !== "number" || value !== Math.floor(value) ||
             value < minimum || value > maximum)
             throw new RangeError(label + " must be an integer from " + minimum + " to " + maximum + ".");
+    }
+
+    function optionalPositiveInteger(value, label) {
+        if (typeof value === "undefined" || value === null) return null;
+        requireInteger(value, 1, MAX_SAFE_INTEGER, label);
+        return value;
     }
 
     function typeConstructor(name) {
@@ -111,6 +119,11 @@
                 throw new TypeError(label + " must be an i32-compatible integer.");
             return;
         }
+        if (type === "i64") {
+            if (typeof value !== "bigint")
+                throw new TypeError(label + " must be a BigInt for i64.");
+            return;
+        }
         if (type === "f32" || type === "f64") {
             if (typeof value !== "number") throw new TypeError(label + " must be a number.");
             return;
@@ -133,14 +146,73 @@
                 throw new TypeError("Signature parameters must be an array: " + name);
             parameters = spec.parameters.slice(0);
             for (i = 0; i < parameters.length; ++i)
-                if (parameters[i] !== "i32" && parameters[i] !== "f32" && parameters[i] !== "f64")
+                if (parameters[i] !== "i32" && parameters[i] !== "i64" &&
+                    parameters[i] !== "f32" && parameters[i] !== "f64")
                     throw new TypeError("Unsupported parameter type for " + name + ": " + parameters[i]);
             result = typeof spec.result === "undefined" ? "void" : spec.result;
-            if (result !== "void" && result !== "i32" && result !== "f32" && result !== "f64")
+            if (result !== "void" && result !== "i32" && result !== "i64" &&
+                result !== "f32" && result !== "f64")
                 throw new TypeError("Unsupported result type for " + name + ": " + result);
             normalized[name] = {parameters: parameters, result: result};
         }
         return normalized;
+    }
+
+    function detectAddressBits(api, options) {
+        var bits = options.addressBits;
+        if (typeof bits !== "undefined" && bits !== null) {
+            if (bits !== 32 && bits !== 64) throw new RangeError("addressBits must be 32 or 64.");
+            return bits;
+        }
+        if (api && typeof api.wb_address_bits === "function") {
+            bits = api.wb_address_bits();
+            if (bits === 32 || bits === 64) return bits;
+        }
+        /* Existing WasmBridge 0.7 modules predate wb_address_bits and are wasm32. */
+        return 32;
+    }
+
+    function requireBigInt(addressBits) {
+        if (addressBits === 64 && typeof root.BigInt !== "function")
+            throw new Error("64-bit WebAssembly addressing requires JavaScript BigInt support.");
+    }
+
+    function toAbiUnsigned(value, addressBits, label) {
+        if (addressBits === 64) {
+            requireBigInt(addressBits);
+            if (typeof value !== "bigint" || value < root.BigInt(0))
+                throw new TypeError(label + " must be a non-negative i64/BigInt value.");
+            return value;
+        }
+        if (typeof value !== "number" || value !== Math.floor(value) ||
+            value < -2147483648 || value > 4294967295)
+            throw new TypeError(label + " must be an i32-compatible integer.");
+        return value < 0 ? value + 4294967296 : value;
+    }
+
+    function fromNumberToAbi(value, addressBits, label) {
+        requireInteger(value, 0, MAX_SAFE_INTEGER, label);
+        if (addressBits === 64) {
+            requireBigInt(addressBits);
+            return root.BigInt(value);
+        }
+        if (value > 4294967295)
+            throw new RangeError(label + " exceeds the wasm32 unsigned range.");
+        return value;
+    }
+
+    function abiToIndex(value, addressBits, label) {
+        value = toAbiUnsigned(value, addressBits, label);
+        if (addressBits === 64) {
+            if (value > root.BigInt(MAX_SAFE_INTEGER))
+                throw new RangeError(label + " exceeds JavaScript's safe ArrayBuffer index range.");
+            return Number(value);
+        }
+        return value;
+    }
+
+    function abiIsZero(value, addressBits) {
+        return addressBits === 64 ? value === root.BigInt(0) : value === 0;
     }
 
     function makeModule(processor, options, publicExports, allocator, signatures) {
@@ -149,11 +221,13 @@
         var memory = api[memoryName] || null;
         var records = [];
         var disposed = false;
-        var maxBufferBytes = options.maxBufferBytes || 16 * 1024 * 1024;
-        var maxMemoryBytes = options.maxMemoryBytes || 32 * 1024 * 1024;
-        var maxHandles = typeof options.maxHandles === "undefined" ? 128 : options.maxHandles;
+        var ownerToken = {};
+        var addressBits = detectAddressBits(api, options);
+        var maxBufferBytes = optionalPositiveInteger(options.maxBufferBytes, "Maximum buffer size");
+        var maxMemoryBytes = optionalPositiveInteger(options.maxMemoryBytes, "Maximum linear memory size");
+        var maxHandles = optionalPositiveInteger(options.maxHandles, "Maximum handle count");
 
-        requireInteger(maxHandles, 1, 65535, "Maximum handle count");
+        requireBigInt(addressBits);
 
         if (allocator && (!memory || !(memory.buffer instanceof ArrayBuffer) ||
             typeof memory.grow !== "function"))
@@ -163,68 +237,101 @@
             if (disposed) throw new Error("Module instance was disposed.");
         }
 
+        function recordIndex(handle) {
+            if (!handle || handle._wasmBridgeOwner !== ownerToken)
+                throw new Error("Unknown buffer handle (or a handle from another module instance).");
+            for (var i = 0; i < records.length; ++i)
+                if (records[i].handle === handle) return i;
+            throw new Error("Buffer handle was released.");
+        }
+
         function resolve(handle) {
             requireActive();
-            for (var i = 0; i < records.length; ++i) {
-                if (records[i].handle === handle) {
-                    if (records[i].released) throw new Error("Buffer handle was released.");
-                    return records[i];
-                }
-            }
-            throw new Error("Unknown buffer handle (or a handle from another module instance).");
+            return records[recordIndex(handle)];
         }
 
         function byteView(record, count, offset) {
             offset = offset || 0;
             if (!memory) throw new Error("Module has no exported memory.");
             if (offset !== Math.floor(offset) || count !== Math.floor(count) ||
-                offset < 0 || count < 0 || offset + count > record.length)
+                offset < 0 || count < 0 || offset > record.length || count > record.length - offset)
                 throw new RangeError("Memory access lies outside the buffer handle.");
-            if (record.pointer < 1 || record.pointer + offset + count > memory.buffer.byteLength)
+            if (record.index < 1 || record.index > memory.buffer.byteLength ||
+                count > memory.buffer.byteLength - record.index - offset)
                 throw new RangeError("Allocation lies outside current linear memory.");
-            return new Uint8Array(memory.buffer, record.pointer + offset, count);
+            return new Uint8Array(memory.buffer, record.index + offset, count);
+        }
+
+        function growFor(bytes) {
+            var pages = Math.max(1, Math.ceil(bytes / PAGE) + 1);
+            var growthBytes = pages * PAGE;
+            if (maxMemoryBytes !== null &&
+                (memory.buffer.byteLength > maxMemoryBytes ||
+                 growthBytes > maxMemoryBytes - memory.buffer.byteLength))
+                throw new RangeError("Configured linear-memory budget reached.");
+            try {
+                if (addressBits === 64) {
+                    try { memory.grow(root.BigInt(pages)); }
+                    catch (first) {
+                        if (!(first instanceof TypeError)) throw first;
+                        memory.grow(pages); /* transitional engines before final memory64 JS API */
+                    }
+                } else memory.grow(pages);
+            } catch (error) {
+                var failure = new RangeError("WebAssembly memory.grow could not satisfy the allocation request.");
+                failure.cause = error;
+                throw failure;
+            }
         }
 
         function allocate(bytes) {
             requireActive();
-            var active = 0;
-            for (var recordIndex = 0; recordIndex < records.length; ++recordIndex)
-                if (!records[recordIndex].released) ++active;
-            if (active >= maxHandles) throw new RangeError("Configured active-handle limit reached.");
             if (!allocator) throw new Error("No allocator was configured for this module.");
-            requireInteger(bytes, 1, maxBufferBytes, "Buffer length");
-            var pointer = api[allocator.allocate](bytes);
-            if (!pointer && options.growMemory !== false) {
-                var pages = Math.max(1, Math.ceil((bytes + PAGE) / PAGE));
-                if (memory.buffer.byteLength + pages * PAGE > maxMemoryBytes)
-                    throw new RangeError("Configured linear-memory budget reached.");
-                memory.grow(pages);
-                pointer = api[allocator.allocate](bytes);
+            requireInteger(bytes, 1, MAX_SAFE_INTEGER, "Buffer length");
+            if (maxBufferBytes !== null && bytes > maxBufferBytes)
+                throw new RangeError("Configured maximum buffer size reached.");
+            if (maxHandles !== null && records.length >= maxHandles)
+                throw new RangeError("Configured active-handle limit reached.");
+
+            var request = fromNumberToAbi(bytes, addressBits, "Buffer length");
+            var pointer = toAbiUnsigned(api[allocator.allocate](request), addressBits, "Allocator pointer");
+            if (abiIsZero(pointer, addressBits) && options.growMemory !== false) {
+                growFor(bytes);
+                pointer = toAbiUnsigned(api[allocator.allocate](request), addressBits, "Allocator pointer");
             }
-            var capacity = pointer && allocator.capacity ? api[allocator.capacity](pointer) : bytes;
-            if (!pointer || pointer !== Math.floor(pointer) || pointer < 1 ||
-                capacity < bytes || pointer + capacity > memory.buffer.byteLength) {
-                if (pointer) api[allocator.release](pointer);
+            var capacityValue = !abiIsZero(pointer, addressBits) && allocator.capacity ?
+                toAbiUnsigned(api[allocator.capacity](pointer), addressBits, "Allocator capacity") :
+                fromNumberToAbi(bytes, addressBits, "Buffer capacity");
+            var pointerIndex = abiToIndex(pointer, addressBits, "Allocator pointer");
+            var capacity = abiToIndex(capacityValue, addressBits, "Allocator capacity");
+            if (abiIsZero(pointer, addressBits) || capacity < bytes ||
+                pointerIndex < 1 || pointerIndex > memory.buffer.byteLength ||
+                capacity > memory.buffer.byteLength - pointerIndex) {
+                if (!abiIsZero(pointer, addressBits)) api[allocator.release](pointer);
                 throw new Error("Allocator failed or returned an invalid pointer/capacity.");
             }
-            var handle = Object.freeze({pointer: pointer, capacity: capacity, byteLength: bytes});
-            records.push({handle: handle, pointer: pointer, capacity: capacity,
-                length: bytes, released: false});
+            var handle = Object.freeze({
+                pointer: pointer, byteOffset: pointerIndex, capacity: capacity,
+                byteLength: bytes, addressBits: addressBits, _wasmBridgeOwner: ownerToken
+            });
+            records.push({handle: handle, pointer: pointer, index: pointerIndex,
+                capacity: capacity, length: bytes});
             return handle;
         }
 
         function release(handle) {
+            requireActive();
             if (!allocator) throw new Error("No allocator was configured for this module.");
-            var record = resolve(handle);
+            var index = recordIndex(handle);
+            var record = records[index];
             if (api[allocator.release](record.pointer) !== 1)
                 throw new Error("Module rejected buffer release.");
-            record.released = true;
+            records.splice(index, 1);
         }
 
         function write(handle, data, offset) {
             var record = resolve(handle);
-            if (!matchesTypedArray(data, Uint8Array) &&
-                !matchesTypedArray(data, Uint8ClampedArray))
+            if (!matchesTypedArray(data, Uint8Array) && !matchesTypedArray(data, Uint8ClampedArray))
                 throw new TypeError("write expects Uint8Array or Uint8ClampedArray.");
             offset = offset || 0;
             requireInteger(offset, 0, record.length, "Write offset");
@@ -252,7 +359,7 @@
             var byteOffset = elementOffset * Constructor.BYTES_PER_ELEMENT;
             var bytes = values.length * Constructor.BYTES_PER_ELEMENT;
             byteView(record, bytes, byteOffset);
-            new Constructor(memory.buffer, record.pointer + byteOffset, values.length).set(values);
+            new Constructor(memory.buffer, record.index + byteOffset, values.length).set(values);
         }
 
         function readTyped(handle, type, count, elementOffset) {
@@ -266,7 +373,7 @@
             requireInteger(count, 0, Math.floor(record.length / Constructor.BYTES_PER_ELEMENT), "Typed element count");
             byteView(record, count * Constructor.BYTES_PER_ELEMENT, byteOffset);
             var copy = new Constructor(count);
-            copy.set(new Constructor(memory.buffer, record.pointer + byteOffset, count));
+            copy.set(new Constructor(memory.buffer, record.index + byteOffset, count));
             return copy;
         }
 
@@ -327,23 +434,24 @@
 
         function dispose() {
             if (disposed) return 0;
-            var released = 0, firstError = null;
+            var released = 0, firstError = null, i, handle;
             if (allocator) {
-                for (var i = 0; i < records.length; ++i) {
-                    if (!records[i].released) {
-                        try {
-                            if (api[allocator.release](records[i].pointer) !== 1)
-                                throw new Error("Module rejected buffer release during disposal.");
-                            records[i].released = true;
-                            ++released;
-                        } catch (error) {
-                            if (!firstError) firstError = error;
-                        }
+                for (i = records.length - 1; i >= 0; --i) {
+                    handle = records[i].handle;
+                    try {
+                        release(handle);
+                        ++released;
+                    } catch (error) {
+                        if (!firstError) firstError = error;
                     }
                 }
             }
+            if (records.length === 0) disposed = true;
+            if (firstError) {
+                firstError.remainingHandles = records.length;
+                throw firstError;
+            }
             disposed = true;
-            if (firstError) throw firstError;
             return released;
         }
 
@@ -354,7 +462,7 @@
                 if (publicExports[i] === name) { allowed = true; break; }
             if (!allowed) throw new Error("Function was not declared as a public export: " + name);
             var args = Array.prototype.slice.call(arguments, 1);
-            var signature = signatures[name], result, i;
+            var signature = signatures[name], result;
             if (signature) {
                 if (args.length !== signature.parameters.length)
                     throw new RangeError(name + " expects " + signature.parameters.length +
@@ -372,6 +480,7 @@
             diagnostic: processor.diagnostic,
             failurePhase: processor.failurePhase,
             wasmFailure: processor.wasmFailure,
+            addressBits: addressBits,
             call: call,
             allocate: allocate,
             release: release,
@@ -385,10 +494,15 @@
             withBuffer: withBuffer,
             dispose: dispose,
             statistics: function () {
-                var active = 0;
-                for (var i = 0; i < records.length; ++i) if (!records[i].released) ++active;
-                return {activeHandles: active, bytesInLinearMemory: memory ? memory.buffer.byteLength : 0,
-                    disposed: disposed, maxHandles: maxHandles};
+                return {
+                    activeHandles: records.length,
+                    bytesInLinearMemory: memory ? memory.buffer.byteLength : 0,
+                    disposed: disposed,
+                    addressBits: addressBits,
+                    maxHandles: maxHandles,
+                    maxBufferBytes: maxBufferBytes,
+                    maxMemoryBytes: maxMemoryBytes
+                };
             }
         };
     }
@@ -424,6 +538,6 @@
         load: load,
         encodeUTF8: utf8Encode,
         decodeUTF8: utf8Decode,
-        version: "0.6.0"
+        version: "0.8.0"
     };
 }(this));

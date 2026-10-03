@@ -1,12 +1,19 @@
 param(
     [switch]$SkipFirefox,
-    [string]$Firefox = "C:\CODEX\Mozilla Firefox\firefox.exe",
-    [string]$ToolRoot = $(if ($env:WASMBRIDGE_TOOLS) { $env:WASMBRIDGE_TOOLS } else { "C:\CODEX\TOOLS\WasmBridge" }),
+    [string]$Firefox,
+    [string]$ToolRoot,
     [int]$Port = 8765
 )
 
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
+if ([String]::IsNullOrEmpty($ToolRoot)) {
+    $ToolRoot = $(if ($env:WASMBRIDGE_TOOLS) { $env:WASMBRIDGE_TOOLS } else { Join-Path $repo "Toolchain" })
+}
+if ([String]::IsNullOrEmpty($Firefox)) {
+    $bundledFirefox = Join-Path $ToolRoot "Firefox52\firefox.exe"
+    $Firefox = $(if (Test-Path -LiteralPath $bundledFirefox) { $bundledFirefox } else { "C:\CODEX\Mozilla Firefox\firefox.exe" })
+}
 $temporary = Join-Path ([System.IO.Path]::GetTempPath()) ("wasmbridge-validation-" + [Guid]::NewGuid().ToString("N"))
 $server = $null
 $startedFirefox = $false
@@ -16,10 +23,10 @@ function Assert-Exit([string]$Label) {
 }
 
 function Resolve-WasmBridgeTool([string]$Name, [string]$RelativePath) {
-    $command = Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($command) { return $command.Source }
     $portable = Join-Path $ToolRoot $RelativePath
     if (Test-Path -LiteralPath $portable) { return $portable }
+    $command = Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($command) { return $command.Source }
     return $null
 }
 
@@ -89,8 +96,8 @@ try {
         if (-not $optimizer) { $missing += 'wasm-opt.exe' }
         if (-not $wasm2js) { $missing += 'wasm2js.exe' }
         if (-not $esbuild) { $missing += 'esbuild.exe' }
-        Write-Host ("SKIP: optional WABT/Binaryen/esbuild validation unavailable: " + ($missing -join ', ') +
-            ". Add tools to PATH or set WASMBRIDGE_TOOLS / -ToolRoot for full toolchain validation.")
+        Write-Host ("SKIP: bundled WABT/Binaryen/esbuild validation unavailable: " + ($missing -join ', ') +
+            ". Run Tools\Import-Toolchain.ps1 or supply -ToolRoot explicitly.")
     }
 
     if ($esbuild) {
@@ -101,7 +108,7 @@ try {
         }
     }
     else {
-        Write-Host "SKIP: Firefox 52 esbuild syntax gate unavailable because esbuild.exe was not found."
+        Write-Host "SKIP: Firefox 52 esbuild syntax gate unavailable because bundled esbuild.exe was not found."
     }
 
     if (-not $SkipFirefox) {

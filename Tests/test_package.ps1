@@ -60,14 +60,34 @@ try {
     & $Cli verify-package --manifest (Join-Path $legacy "manifest.json")
     if ($LASTEXITCODE -ne 0) { throw "Legacy package verification failed." }
 
+    # Windows PowerShell 5.1 turns native stderr into NativeCommandError records.
+    # These two commands are expected to fail, so temporarily allow stderr to
+    # flow into 2>&1 and assert the process exit code/message ourselves.
     Add-Content -LiteralPath (Join-Path $general "fallback.js") -Value "// deliberate tamper"
-    $tamperOutput = & $Cli verify-package --manifest (Join-Path $general "manifest.json") 2>&1
-    if ($LASTEXITCODE -eq 0 -or ($tamperOutput -join " ") -notmatch "SHA-256 mismatch") {
+    $savedErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $tamperOutput = & $Cli verify-package --manifest (Join-Path $general "manifest.json") 2>&1
+        $tamperExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
+    if ($tamperExitCode -eq 0 -or ($tamperOutput -join " ") -notmatch "SHA-256 mismatch") {
         throw "Package verifier did not reject a modified artifact."
     }
+
     Set-Content -LiteralPath (Join-Path $legacy "unexpected.txt") -Value "unexpected"
-    $unexpectedOutput = & $Cli verify-package --manifest (Join-Path $legacy "manifest.json") 2>&1
-    if ($LASTEXITCODE -eq 0 -or ($unexpectedOutput -join " ") -notmatch "Unexpected package artifact") {
+    $savedErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $unexpectedOutput = & $Cli verify-package --manifest (Join-Path $legacy "manifest.json") 2>&1
+        $unexpectedExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
+    if ($unexpectedExitCode -eq 0 -or ($unexpectedOutput -join " ") -notmatch "Unexpected package artifact") {
         throw "Package verifier did not reject an unexpected artifact."
     }
 

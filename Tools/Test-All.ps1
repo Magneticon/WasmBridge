@@ -1,7 +1,7 @@
 param(
     [switch]$SkipFirefox,
     [string]$Firefox = "C:\CODEX\Mozilla Firefox\firefox.exe",
-    [string]$ToolRoot = "C:\CODEX\TOOLS\WasmBridge",
+    [string]$ToolRoot = $(if ($env:WASMBRIDGE_TOOLS) { $env:WASMBRIDGE_TOOLS } else { "C:\CODEX\TOOLS\WasmBridge" }),
     [int]$Port = 8765
 )
 
@@ -13,6 +13,14 @@ $startedFirefox = $false
 
 function Assert-Exit([string]$Label) {
     if ($LASTEXITCODE -ne 0) { throw "$Label failed with exit code $LASTEXITCODE." }
+}
+
+function Resolve-WasmBridgeTool([string]$Name, [string]$RelativePath) {
+    $command = Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($command) { return $command.Source }
+    $portable = Join-Path $ToolRoot $RelativePath
+    if (Test-Path -LiteralPath $portable) { return $portable }
+    return $null
 }
 
 function Get-FirefoxMajorVersion([string]$Path) {
@@ -66,14 +74,34 @@ try {
         Assert-Exit $_.Name
     }
 
-    & (Join-Path $PSScriptRoot "Test-ExternalToolchain.ps1") -ToolRoot $ToolRoot -OutputDirectory (Join-Path $temporary "external")
-    Assert-Exit "External toolchain tests"
+    $validator = Resolve-WasmBridgeTool 'wasm-validate.exe' 'wabt-1.0.42\bin\wasm-validate.exe'
+    $optimizer = Resolve-WasmBridgeTool 'wasm-opt.exe' 'binaryen-version_133\bin\wasm-opt.exe'
+    $wasm2js = Resolve-WasmBridgeTool 'wasm2js.exe' 'binaryen-version_133\bin\wasm2js.exe'
+    $esbuild = Resolve-WasmBridgeTool 'esbuild.exe' 'esbuild-0.28.2\esbuild.exe'
 
-    $esbuild = Join-Path $ToolRoot "esbuild-0.28.2\esbuild.exe"
-    Get-ChildItem -LiteralPath (Join-Path $repo "Runtime") -Filter "*.js" | Sort-Object Name | ForEach-Object {
-        $output = Join-Path $temporary ($_.Name + ".firefox52.js")
-        & $esbuild $_.FullName --bundle --target=firefox52 "--outfile=$output"
-        Assert-Exit ("Firefox 52 syntax: " + $_.Name)
+    if ($validator -and $optimizer -and $wasm2js -and $esbuild) {
+        & (Join-Path $PSScriptRoot "Test-ExternalToolchain.ps1") -ToolRoot $ToolRoot -OutputDirectory (Join-Path $temporary "external")
+        Assert-Exit "External toolchain tests"
+    }
+    else {
+        $missing = @()
+        if (-not $validator) { $missing += 'wasm-validate.exe' }
+        if (-not $optimizer) { $missing += 'wasm-opt.exe' }
+        if (-not $wasm2js) { $missing += 'wasm2js.exe' }
+        if (-not $esbuild) { $missing += 'esbuild.exe' }
+        Write-Host ("SKIP: optional WABT/Binaryen/esbuild validation unavailable: " + ($missing -join ', ') +
+            ". Add tools to PATH or set WASMBRIDGE_TOOLS / -ToolRoot for full toolchain validation.")
+    }
+
+    if ($esbuild) {
+        Get-ChildItem -LiteralPath (Join-Path $repo "Runtime") -Filter "*.js" | Sort-Object Name | ForEach-Object {
+            $output = Join-Path $temporary ($_.Name + ".firefox52.js")
+            & $esbuild $_.FullName --bundle --target=firefox52 "--outfile=$output"
+            Assert-Exit ("Firefox 52 syntax: " + $_.Name)
+        }
+    }
+    else {
+        Write-Host "SKIP: Firefox 52 esbuild syntax gate unavailable because esbuild.exe was not found."
     }
 
     if (-not $SkipFirefox) {

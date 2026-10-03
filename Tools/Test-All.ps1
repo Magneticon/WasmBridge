@@ -15,6 +15,15 @@ function Assert-Exit([string]$Label) {
     if ($LASTEXITCODE -ne 0) { throw "$Label failed with exit code $LASTEXITCODE." }
 }
 
+function Get-FirefoxMajorVersion([string]$Path) {
+    $info = (Get-Item -LiteralPath $Path).VersionInfo
+    $versionText = $info.ProductVersion
+    if ([String]::IsNullOrEmpty($versionText)) { $versionText = $info.FileVersion }
+    $match = [regex]::Match(($versionText + ""), '^\s*(\d+)')
+    if (-not $match.Success) { return -1 }
+    return [int]$match.Groups[1].Value
+}
+
 function Invoke-FirefoxPage([string]$RelativeUrl) {
     $url = "http://127.0.0.1:$Port/$RelativeUrl"
     & $Firefox -no-remote -profile (Join-Path $ToolRoot "Firefox52-TestProfile") -new-window $url
@@ -69,6 +78,13 @@ try {
 
     if (-not $SkipFirefox) {
         if (-not (Test-Path -LiteralPath $Firefox)) { throw "Firefox executable not found: $Firefox" }
+        $firefoxMajor = Get-FirefoxMajorVersion $Firefox
+        if ($firefoxMajor -ne 52) {
+            $versionInfo = (Get-Item -LiteralPath $Firefox).VersionInfo
+            $detected = $versionInfo.ProductVersion
+            if ([String]::IsNullOrEmpty($detected)) { $detected = $versionInfo.FileVersion }
+            throw "Legacy browser acceptance requires Firefox 52.x, but '$Firefox' is version $detected. Run this host matrix with -SkipFirefox, then run the browser acceptance pages on the XP Firefox 52.9 ESR machine via the documented 192.168.255.2:8084 endpoint."
+        }
         if (Get-Process firefox -ErrorAction SilentlyContinue) {
             throw "Firefox is already running; close it before the isolated acceptance matrix."
         }

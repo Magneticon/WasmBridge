@@ -37,9 +37,20 @@ exit /b %errorlevel%
     }
     if (-not (Test-Path -LiteralPath $output)) { throw "Fake emcc output was not accepted." }
 
+    # This command is expected to fail. Windows PowerShell 5.1 converts native
+    # stderr into NativeCommandError records when ErrorActionPreference is Stop,
+    # so temporarily let stderr flow into 2>&1 and inspect the exit ourselves.
     $badOutput = Join-Path $temporary "bad.wasm"
-    $bad = & $Cli build-emscripten --source $source --out $badOutput --emcc $fake --export "bad-name" 2>&1
-    if ($LASTEXITCODE -eq 0 -or ($bad -join " ") -notmatch "simple C symbols") {
+    $savedErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $bad = & $Cli build-emscripten --source $source --out $badOutput --emcc $fake --export "bad-name" 2>&1
+        $badExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
+    if ($badExitCode -eq 0 -or ($bad -join " ") -notmatch "simple C symbols") {
         throw "Invalid Emscripten export name was not rejected."
     }
     Write-Host "PASS: Emscripten batch launcher, legacy flags, exports, output verification and validation errors."

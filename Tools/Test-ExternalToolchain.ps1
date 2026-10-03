@@ -25,8 +25,15 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $cli generate-fallback --wasm $input --out $candidate --validator $validator --wasm2js $wasm2js --esbuild $esbuild
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+# Test the freshly generated candidate against the current BufferArena ABI.
+# This avoids trusting the historical checked-in candidate after buffers.wasm
+# changes and proves the current toolchain output still matches the maintained
+# handwritten fallback.
+& node (Join-Path $repoRoot 'Tests\test_generated_fallback_node.js') $candidate $input
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host ('WABT: ' + (& $validator --version))
 Write-Host ('Binaryen wasm-opt: ' + (& $optimizer --version))
 Write-Host ('Binaryen wasm2js: ' + (& $wasm2js --version))
 Write-Host ('esbuild: ' + (& $esbuild --version))
-Write-Host "PASS: external toolchain outputs are under $OutputDirectory"
+Write-Host "PASS: external toolchain outputs and fresh generated-fallback parity are verified under $OutputDirectory"

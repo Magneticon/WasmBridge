@@ -20,3 +20,18 @@ AI_RUN_LOG_W10.txt
 DBGOUT*
 # Keep the small intentionally checked-in wasm32 smoke-test fixture
 !Examples/HelloWorld/add.wasm
+
+# WasmBridge intentionally vendors its pinned SDK/toolchain under Toolchain/.
+# Later negation rules override the generic *.exe/*.dll ignores above.
+!Toolchain/
+!Toolchain/**
+# Do not vendor nested VCS metadata or transient caches from upstream toolsets.
+Toolchain/**/.git/
+Toolchain/**/.git/**
+Toolchain/**/.cache/
+Toolchain/**/.cache/**
+Toolchain/**/__pycache__/
+Toolchain/**/__pycache__/**
+Toolchain/**/*.pyc
+Toolchain/**/*.tmp
+Toolchain/**/*.log

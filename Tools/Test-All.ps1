@@ -117,12 +117,25 @@ try {
             "Examples/ImageProcessing/index.html?fallback=1",
             "Examples/BufferArena/index.html",
             "Examples/BufferArena/index.html?fallback=1",
-            "Examples/BufferArena/generated-fallback-probe.html",
             "Examples/GeneralModule/index.html",
             "Examples/GeneralModule/index.html?fallback=1",
             "Examples/PackageLoader/index.html",
             "Examples/PackageLoader/index.html?fallback=1"
         )
+
+        $candidateMetadataPath = Join-Path $repo "Examples\BufferArena\buffers-generated-candidate.json"
+        $bufferWasmPath = Join-Path $repo "Examples\BufferArena\buffers.wasm"
+        if ((Test-Path -LiteralPath $candidateMetadataPath) -and (Test-Path -LiteralPath $bufferWasmPath)) {
+            $candidateMetadata = Get-Content -LiteralPath $candidateMetadataPath -Raw | ConvertFrom-Json
+            $currentWasmHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $bufferWasmPath).Hash.ToLowerInvariant()
+            if ($candidateMetadata.inputSha256 -eq $currentWasmHash) {
+                $pages += "Examples/BufferArena/generated-fallback-probe.html"
+            }
+            else {
+                Write-Host "SKIP: checked-in generated-fallback browser probe is stale for the current buffers.wasm."
+            }
+        }
+
         foreach ($page in $pages) { Invoke-FirefoxPage $page }
     }
 

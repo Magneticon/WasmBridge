@@ -1,0 +1,327 @@
+var WasmBridgeGeneratedCandidate = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function")
+      for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key; i < n; i++) {
+        key = keys[i];
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: ((k) => from[k]).bind(null, key), enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+      }
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // ../../../Users/CODEX/AppData/Local/Temp/wasmbridge-d9081521775b40b28add4bf64baa8573.mjs
+  var wasmbridge_d9081521775b40b28add4bf64baa8573_exports = {};
+  __export(wasmbridge_d9081521775b40b28add4bf64baa8573_exports, {
+    memory: () => memory,
+    wb_active_count: () => wb_active_count,
+    wb_alloc: () => wb_alloc,
+    wb_capacity: () => wb_capacity,
+    wb_free: () => wb_free,
+    wb_invert_rgba: () => wb_invert_rgba
+  });
+  function asmFunc(imports) {
+    var buffer = new ArrayBuffer(131072);
+    var HEAP8 = new Int8Array(buffer);
+    var HEAP16 = new Int16Array(buffer);
+    var HEAP32 = new Int32Array(buffer);
+    var HEAPU8 = new Uint8Array(buffer);
+    var HEAPU16 = new Uint16Array(buffer);
+    var HEAPU32 = new Uint32Array(buffer);
+    var HEAPF32 = new Float32Array(buffer);
+    var HEAPF64 = new Float64Array(buffer);
+    var Math_imul = Math.imul;
+    var Math_fround = Math.fround;
+    var Math_abs = Math.abs;
+    var Math_clz32 = Math.clz32;
+    var Math_min = Math.min;
+    var Math_max = Math.max;
+    var Math_floor = Math.floor;
+    var Math_ceil = Math.ceil;
+    var Math_trunc = Math.trunc;
+    var Math_sqrt = Math.sqrt;
+    function $0($0_1) {
+      $0_1 = $0_1 | 0;
+      var $1_1 = 0, $2_1 = 0, $3_1 = 0, $4_1 = 0;
+      block: {
+        if ($0_1 - 33554433 >>> 0 < 4261412864) {
+          break block;
+        }
+        $3_1 = $0_1 + 7 & 134217720;
+        $2_1 = -1;
+        $0_1 = 1024;
+        block3: {
+          while (1) {
+            if (!HEAP32[$0_1 + 8 >> 2]) {
+              $4_1 = HEAP32[$0_1 >> 2];
+              if (!(!$4_1 | HEAPU32[$0_1 + 4 >> 2] < $3_1 >>> 0)) {
+                $2_1 = $1_1;
+                break block3;
+              }
+              $2_1 = $4_1 ? $2_1 : ($2_1 | 0) < 0 ? $1_1 : $2_1;
+            }
+            $0_1 = $0_1 + 12 | 0;
+            $1_1 = $1_1 + 1 | 0;
+            if (($1_1 | 0) != 128) {
+              continue;
+            }
+            break;
+          }
+          ;
+          $4_1 = 0;
+          if (($2_1 | 0) < 0) {
+            break block;
+          }
+          $0_1 = HEAP32[640];
+          if (!$0_1) {
+            HEAP32[640] = 35344;
+            $0_1 = 35344;
+          }
+          if ($3_1 >>> 0 > 33554432 | $0_1 >>> 0 > 33554432 | 33554432 - $0_1 >>> 0 < $3_1 >>> 0) {
+            break block;
+          }
+          $1_1 = __wasm_memory_size() << 16;
+          if ($1_1 >>> 0 < $0_1 >>> 0 | $1_1 - $0_1 >>> 0 < $3_1 >>> 0) {
+            break block;
+          }
+          HEAP32[640] = $0_1 + $3_1;
+          $1_1 = Math_imul($2_1, 12);
+          HEAP32[$1_1 + 1028 >> 2] = $3_1;
+          HEAP32[$1_1 + 1024 >> 2] = $0_1;
+          $4_1 = $0_1;
+        }
+        HEAP32[Math_imul($2_1, 12) + 1032 >> 2] = 1;
+      }
+      return $4_1 | 0;
+    }
+    function $1($0_1) {
+      $0_1 = $0_1 | 0;
+      var $1_1 = 0, $2_1 = 0;
+      if (!$0_1) {
+        return 0;
+      }
+      $1_1 = -1536;
+      block2: {
+        block4: {
+          while (1) {
+            if (HEAP32[$1_1 + 2568 >> 2] ? ($0_1 | 0) == HEAP32[$1_1 + 2560 >> 2] : 0) {
+              break block2;
+            }
+            if (HEAP32[$1_1 + 2580 >> 2] ? ($0_1 | 0) == HEAP32[$1_1 + 2572 >> 2] : 0) {
+              break block4;
+            }
+            $2_1 = $2_1 + 2 | 0;
+            $1_1 = $1_1 + 24 | 0;
+            if ($1_1) {
+              continue;
+            }
+            break;
+          }
+          ;
+          return 0;
+        }
+        $2_1 = $2_1 + 1 | 0;
+      }
+      HEAP32[Math_imul($2_1, 12) + 1032 >> 2] = 0;
+      return 1;
+    }
+    function $2($0_1) {
+      $0_1 = $0_1 | 0;
+      var $1_1 = 0, $2_1 = 0;
+      if (!$0_1) {
+        return 0;
+      }
+      $1_1 = -1536;
+      block2: {
+        block4: {
+          while (1) {
+            if (HEAP32[$1_1 + 2568 >> 2] ? ($0_1 | 0) == HEAP32[$1_1 + 2560 >> 2] : 0) {
+              break block2;
+            }
+            if (HEAP32[$1_1 + 2580 >> 2] ? ($0_1 | 0) == HEAP32[$1_1 + 2572 >> 2] : 0) {
+              break block4;
+            }
+            $2_1 = $2_1 + 2 | 0;
+            $1_1 = $1_1 + 24 | 0;
+            if ($1_1) {
+              continue;
+            }
+            break;
+          }
+          ;
+          return 0;
+        }
+        $2_1 = $2_1 + 1 | 0;
+      }
+      return HEAP32[Math_imul($2_1, 12) + 1028 >> 2];
+    }
+    function $3() {
+      var $0_1 = 0, $1_1 = 0;
+      $0_1 = -1536;
+      while (1) {
+        $1_1 = ((((HEAP32[$0_1 + 2568 >> 2] != 0) + $1_1 | 0) + (HEAP32[$0_1 + 2580 >> 2] != 0) | 0) + (HEAP32[$0_1 + 2592 >> 2] != 0) | 0) + (HEAP32[$0_1 + 2604 >> 2] != 0) | 0;
+        $0_1 = $0_1 + 48 | 0;
+        if ($0_1) {
+          continue;
+        }
+        break;
+      }
+      ;
+      return $1_1 | 0;
+    }
+    function $4($0_1, $1_1, $2_1) {
+      $0_1 = $0_1 | 0;
+      $1_1 = $1_1 | 0;
+      $2_1 = $2_1 | 0;
+      var $3_1 = 0, $4_1 = 0, $5 = 0;
+      $4_1 = 0;
+      block: {
+        if (!$0_1) {
+          break block;
+        }
+        block4: {
+          block2: {
+            while (1) {
+              if (HEAP32[$3_1 + 1032 >> 2] ? ($0_1 | 0) == HEAP32[$3_1 + 1024 >> 2] : 0) {
+                break block2;
+              }
+              if (HEAP32[$3_1 + 1044 >> 2] ? ($0_1 | 0) == HEAP32[$3_1 + 1036 >> 2] : 0) {
+                break block4;
+              }
+              $3_1 = $3_1 + 24 | 0;
+              if (($3_1 | 0) != 1536) {
+                continue;
+              }
+              break;
+            }
+            ;
+            $4_1 = 0;
+            break block;
+          }
+          $4_1 = $3_1 + 1024 | 0;
+          break block;
+        }
+        $4_1 = $3_1 + 1036 | 0;
+      }
+      block5: {
+        if (!$1_1) {
+          break block5;
+        }
+        $3_1 = 0;
+        block9: {
+          block7: {
+            while (1) {
+              if (HEAP32[$3_1 + 1032 >> 2] ? ($1_1 | 0) == HEAP32[$3_1 + 1024 >> 2] : 0) {
+                break block7;
+              }
+              if (HEAP32[$3_1 + 1044 >> 2] ? ($1_1 | 0) == HEAP32[$3_1 + 1036 >> 2] : 0) {
+                break block9;
+              }
+              $3_1 = $3_1 + 24 | 0;
+              if (($3_1 | 0) != 1536) {
+                continue;
+              }
+              break;
+            }
+            ;
+            break block5;
+          }
+          $5 = $3_1 + 1024 | 0;
+          break block5;
+        }
+        $5 = $3_1 + 1036 | 0;
+      }
+      $3_1 = -1;
+      block10: {
+        if ($2_1 & 3 | ($2_1 | 0) <= 0 | (!$4_1 | !$5)) {
+          break block10;
+        }
+        if (HEAPU32[$4_1 + 4 >> 2] < $2_1 >>> 0 | HEAPU32[$5 + 4 >> 2] < $2_1 >>> 0) {
+          break block10;
+        }
+        $3_1 = 0;
+        while (1) {
+          $5 = $1_1 + $3_1 | 0;
+          $4_1 = $0_1 + $3_1 | 0;
+          HEAP8[$5 | 0] = HEAPU8[$4_1 | 0] ^ -1;
+          HEAP8[$5 + 1 | 0] = HEAPU8[$4_1 + 1 | 0] ^ -1;
+          HEAP8[$5 + 2 | 0] = HEAPU8[$4_1 + 2 | 0] ^ -1;
+          HEAP8[$5 + 3 | 0] = HEAPU8[$4_1 + 3 | 0];
+          $3_1 = $3_1 + 4 | 0;
+          if ($3_1 >>> 0 < $2_1 >>> 0) {
+            continue;
+          }
+          break;
+        }
+        ;
+        $3_1 = $2_1;
+      }
+      return $3_1 | 0;
+    }
+    function __wasm_memory_size() {
+      return buffer.byteLength >> 16;
+    }
+    function __wasm_memory_grow(pagesToAdd) {
+      pagesToAdd = pagesToAdd | 0;
+      var oldPages = __wasm_memory_size() | 0;
+      var newPages = oldPages + pagesToAdd | 0;
+      if (oldPages < newPages && newPages < 65536 && newPages <= 1024) {
+        var newBuffer = new ArrayBuffer(newPages << 16);
+        var newHEAP8 = new Int8Array(newBuffer);
+        newHEAP8.set(HEAP8);
+        HEAP8 = new Int8Array(newBuffer);
+        HEAP16 = new Int16Array(newBuffer);
+        HEAP32 = new Int32Array(newBuffer);
+        HEAPU8 = new Uint8Array(newBuffer);
+        HEAPU16 = new Uint16Array(newBuffer);
+        HEAPU32 = new Uint32Array(newBuffer);
+        HEAPF32 = new Float32Array(newBuffer);
+        HEAPF64 = new Float64Array(newBuffer);
+        buffer = newBuffer;
+      }
+      return oldPages;
+    }
+    return {
+      "memory": Object.create(Object.prototype, {
+        "grow": {
+          "value": __wasm_memory_grow
+        },
+        "buffer": {
+          "get": function() {
+            return buffer;
+          }
+        }
+      }),
+      "wb_alloc": $0,
+      "wb_free": $1,
+      "wb_capacity": $2,
+      "wb_active_count": $3,
+      "wb_invert_rgba": $4
+    };
+  }
+  var retasmFunc = asmFunc({});
+  var memory = retasmFunc.memory;
+  var wb_alloc = retasmFunc.wb_alloc;
+  var wb_free = retasmFunc.wb_free;
+  var wb_capacity = retasmFunc.wb_capacity;
+  var wb_active_count = retasmFunc.wb_active_count;
+  var wb_invert_rgba = retasmFunc.wb_invert_rgba;
+  return __toCommonJS(wasmbridge_d9081521775b40b28add4bf64baa8573_exports);
+})();
+`Î_¡uJ      jºQöjºQöIúc¡       J    :http://127.0.0.1:8765/Examples/BufferArena/buffers-generated-candidate.js strongly-framed 1 request-method GET response-head HTTP/1.1 200 OK
+Content-Type: application/javascript; charset=utf-8
+Date: Mon, 28 Sep 2026 11:39:34 GMT
+ original-response-headers Content-Type: application/javascript; charset=utf-8
+Date: Mon, 28 Sep 2026 11:39:34 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+ uncompressed-len 0 net-response-time-onstart 64 net-response-time-onstop 64   %¿

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WasmBridge BufferArena - RUNNING</title>
+<style>
+body { font: 14px Arial,sans-serif; max-width: 940px; margin: 22px auto; padding: 0 15px; color: #292929; }
+h1 { font-size: 23px; }
+.controls { border: 1px solid #bfc6d0; background: #f2f4f8; padding: 10px; }
+button, select { margin: 0 7px 0 3px; }
+.canvases { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 15px; }
+canvas { width: 256px; height: 160px; border: 1px solid #888; }
+.panel { width: 268px; }
+pre { padding: 12px; border: 1px solid #aaa; background: #fafafa; white-space: pre-wrap; line-height: 1.45; }
+small { color: #555; }
+</style>
+<script src="../../Runtime/legacy-compat.js"></script>
+<script src="../../Runtime/wasmbridge.js"></script>
+<script src="../../Runtime/buffers.js"></script>
+</head>
+<body>
+<h1>WasmBridge: dynamic memory + independent buffers</h1>
+<p>Reusable Wasm / JavaScript allocator with checked handles, memory growth, typed-array copies and
+byte-for-byte RGBA parity. The buffer manager is reusable; color inversion is only a demonstration.</p>
+<div class="controls">
+<label><input id="force" type="checkbox"> Force JavaScript fallback</label>
+<label>Image size <select id="size">
+<option value="64">64 x 64</option>
+<option value="256" selected>256 x 256</option>
+<option value="512">512 x 512</option>
+<option value="1024">1024 x 1024</option>
+</select></label>
+<button id="run" type="button">Run memory + image tests</button><br>
+<small>Benchmarks include allocation, input/output copies and processing; comparison is local to this browser.</small>
+</div>
+<div class="canvases">
+<div class="panel"><strong>Original</strong><br><canvas id="before" width="256" height="256"></canvas></div>
+<div class="panel"><strong>Inverted</strong><br><canvas id="after" width="256" height="256"></canvas></div>
+</div>
+<pre id="report">Starting...</pre>
+<script>
+(function () {
+    "use strict";
+    var report = document.getElementById("report");
+    var runButton = document.getElementById("run");
+    var force = document.getElementById("force");
+    var size = document.getElementById("size");
+    var sourceCanvas = document.getElementById("before");
+    var outputCanvas = document.getElementById("after");
+    var serial = 0;
+    if (location.search.indexOf("fallback=1") >= 0) force.checked = true;
+    function now() { return window.performance && performance.now ? performance.now() : Date.now(); }
+    function assert(condition, message) { if (!condition) throw new Error(message); }
+    function same(a, b) {
+        if (a.length !== b.length) return false;
+        for (var i = 0; i < a.length; ++i) if (a[i] !== b[i]) return false;
+        return true;
+    }
+    function sample(n) {
+        var out = new Uint8ClampedArray(n * n * 4);
+        for (var y = 0; y < n; ++y) for (var x = 0; x < n; ++x) {
+            var i = (y * n + x) * 4;
+            out[i] = (x * 255 / (n - 1)) | 0;
+            out[i + 1] = (y * 255 / (n - 1)) | 0;
+            out[i + 2] = ((x ^ y) & 255);
+            out[i + 3] = ((x / 16 | 0) + (y / 16 | 0)) % 4 === 0 ? 80 : 255;
+        }
+        return out;
+    }
+    function reference(input) {
+        var out = new Uint8ClampedArray(input.length);
+        for (var i = 0; i < input.length; i += 4) {
+            out[i] = 255 - input[i];
+            out[i + 1] = 255 - input[i + 1];
+            out[i + 2] = 255 - input[i + 2];
+            out[i + 3] = input[i + 3];
+        }
+        return out;
+    }
+    function paint(canvas, pixels, width) {
+        canvas.width = width; canvas.height = width;
+        var c = canvas.getContext("2d");
+        var image = c.createImageData(width, width);
+        image.data.set(pixels);
+        c.putImageData(image, 0, 0);
+        canvas.style.width = "256px"; canvas.style.height = "256px";
+    }
+    function load(preferWasm) {
+        return WasmBridgeBuffers.load({
+            wasm: "buffers.wasm", fallback: "buffers-fallback.js",
+            fallbackGlobal: "WasmBridgeBuffersFallback", preferWasm: preferWasm
+        });
+    }
+    function probeBuffers(manager) {
+        var initial = manager.statistics().bytesInLinearMemory;
+        var first = null, second = null, passed = false, stale = false;
+        try {
+            first = manager.allocate(2 * 1024 * 1024);
+            manager.write(first, new Uint8Array([3, 5, 7, 9]));
+            second = manager.allocate(2 * 1024 * 1024);
+            assert(first.pointer !== second.pointer, "Live buffers overlap.");
+            assert(manager.statistics().activeBlocks >= 2, "Missing live allocations.");
+            assert(same(manager.read(first, 4), [3, 5, 7, 9]),
+                "Growing memory corrupted previously written bytes.");
+            passed = true;
+        } finally {
+            if (second) manager.release(second);
+            if (first) manager.release(first);
+        }
+        try { manager.read(first, 1); }
+        catch (e) { stale = /released/.test(e.message); }
+        assert(stale, "Released handle was still readable.");
+        assert(manager.statistics().activeBlocks === 0, "Memory test leaked live allocations.");
+        return {passed: passed && stale, before: initial,
+                after: manager.statistics().bytesInLinearMemory};
+    }
+    function benchmark(manager, input, width, count) {
+        var started = now(), output = null;
+        for (var i = 0; i < count; ++i) output = manager.processRGBA(input, width, width);
+        return {ms: (now() - started) / count, output: output};
+    }
+    function run() {
+        var mine = ++serial;
+        var width = +size.value, input = sample(width), expected = reference(input);
+        var forced = force.checked, begin = now();
+        report.textContent = "Loading backend...";
+        runButton.disabled = true;
+        load(!forced).then(function (selected) {
+            var startupMs = now() - begin;
+            var probe = probeBuffers(selected);
+            var result = benchmark(selected, input, width, 3);
+            assert(same(result.output, expected), "Selected backend differs from independent JS reference.");
+            assert(same(input, sample(width)), "Original pixel buffer was changed.");
+            var opposite = selected.backend === "wasm" ? false : true;
+            return load(opposite).then(function (comparison) {
+                var other = benchmark(comparison, input, width, 3);
+                assert(same(result.output, other.output), "Wasm and JavaScript results differ.");
+                if (mine !== serial) return;
+                paint(sourceCanvas, input, width);
+                paint(outputCanvas, result.output, width);
+                var crossBackend = selected.backend !== comparison.backend;
+                report.textContent =
+                    "PASS: " + width + " x " + width + " (" + input.length + " RGBA bytes)" +
+                    "\nSelected backend: " + selected.backend +
+                    "\nReference byte parity: PASS" +
+                    "\n" + (crossBackend ? "Wasm / JS byte parity: PASS" :
+                        "Comparison backend: " + comparison.backend + " (Wasm unavailable; cross-backend parity not tested)") +
+                    "\nIndependent live buffers, retained bytes, released-handle rejection: PASS" +
+                    "\nLinear memory before/after buffer test: " +
+                    probe.before + " / " + probe.after + " bytes" +
+                    (probe.after > probe.before ? " (grew)" : " (existing capacity reused)") +
+                    "\nActive allocations after test: " + selected.statistics().activeBlocks +
+                    "\nSelected backend startup/validation: " + startupMs.toFixed(2) + " ms" +
+                    "\nSelected end-to-end image operation (mean of 3): " + result.ms.toFixed(2) + " ms" +
+                    "\nComparison " + comparison.backend + " end-to-end (mean of 3): " +
+                    other.ms.toFixed(2) + " ms" +
+                    "\nTiming includes allocation, input/output copies and RGB processing; not a native-C benchmark." +
+                    "\nDiagnostics: " + (selected.diagnostic || "(none)") +
+                    "\nBrowser: " + navigator.userAgent;
+                document.title = "PASS - WasmBridge BufferArena (" + selected.backend + ")";
+            });
+        }).catch(function (e) {
+            if (mine === serial) {
+                report.textContent = "FAIL: " + e.message;
+                document.title = "FAIL - WasmBridge BufferArena";
+            }
+        }).then(function () {
+            if (mine === serial) runButton.disabled = false;
+        });
+    }
+    runButton.onclick = run;
+    run();
+}());
+</script>
+</body>
+</html>
+Jû:           jºc¨IúoC       A    :http://127.0.0.1:8765/Examples/BufferArena/index.html?fallback=1 strongly-framed 1 request-method GET response-head HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+Date: Mon, 28 Sep 2026 12:51:10 GMT
+ original-response-headers Content-Type: text/html; charset=utf-8
+Date: Mon, 28 Sep 2026 12:51:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+ uncompressed-len 0   "«

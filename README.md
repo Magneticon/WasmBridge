@@ -110,12 +110,27 @@ http://192.168.255.2:8084/Examples/WasmSelfTest/index.html
 
 The native self-test verifies wasm32 addressing, growth beyond the former 32 MiB ceiling and more than 128 simultaneous allocations.
 
+## Release archives
+
+`Tools\New-Release.ps1` creates both release flavors by default:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File Tools\New-Release.ps1
+```
+
+- `WasmBridge-0.8.0-Complete.zip` — preservation-grade SDK containing source, tests, examples, documentation, binaries and the pinned host toolchain.
+- `WasmBridge-0.8.0-Runtime.zip` — smaller deployment package containing runtime binaries/scripts, public headers, documentation, selected examples and verified sample packages.
+
+Use `-Flavor Complete` or `-Flavor Runtime` to generate only one flavor. The legacy `-RuntimeOnly` switch remains an alias for the Runtime flavor.
+
 ## Documentation
 
+- [`Documentation/WasmBridge_0.8_Architecture_API_Programming_Reference.pdf`](Documentation/WasmBridge_0.8_Architecture_API_Programming_Reference.pdf) — black-and-white architecture, API and programming-reference manual.
 - [`Documentation/PROGRAMMING_GUIDE.md`](Documentation/PROGRAMMING_GUIDE.md) — source-language migration and programming guide.
 - [`Documentation/API_REFERENCE.md`](Documentation/API_REFERENCE.md) — runtime/CLI API reference.
 - [`Documentation/MEMORY_AND_ADDRESSING.md`](Documentation/MEMORY_AND_ADDRESSING.md) — wasm32, memory64, process bitness, allocator and quota model.
 - [`Documentation/FF52_COMPATIBILITY.md`](Documentation/FF52_COMPATIBILITY.md) — Firefox 52 syntax/toolchain profile.
 - [`Documentation/GETTING_STARTED.md`](Documentation/GETTING_STARTED.md) — setup and first module.
 - [`Documentation/XP_FIREFOX_TEST_ENDPOINT.md`](Documentation/XP_FIREFOX_TEST_ENDPOINT.md) — standard XP LAN test endpoint.
+- [`Documentation/VALIDATION_0.8.0.md`](Documentation/VALIDATION_0.8.0.md) — release acceptance matrix including the real XP/Firefox 52 run.
 - [`Toolchain/README.md`](Toolchain/README.md) — bundled toolchain layout and policy.

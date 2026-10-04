@@ -35,3 +35,6 @@ Toolchain/**/__pycache__/**
 Toolchain/**/*.pyc
 Toolchain/**/*.tmp
 Toolchain/**/*.log
+# Firefox acceptance uses the real XP browser; never vendor a live profile.
+Toolchain/Firefox52-TestProfile/
+Toolchain/Firefox52-TestProfile/**

@@ -1,3 +1,4 @@
+[CmdletBinding(PositionalBinding=$false)]
 param(
     [string]$Source,
     [string]$Destination,
@@ -17,6 +18,13 @@ if ([String]::IsNullOrEmpty($Source)) {
 }
 if ([String]::IsNullOrEmpty($Destination)) {
     $Destination = Join-Path $repo "Toolchain"
+}
+
+# A PowerShell backtick is a line-continuation character only when interpreted
+# by PowerShell itself. If this script is launched from cmd.exe with copied
+# multi-line PowerShell syntax, a literal backtick can otherwise become a path.
+if ($Source.Trim() -eq "`" -or $Destination.Trim() -eq "`") {
+    throw "A literal backtick was passed as a path. From cmd.exe, run Import-Toolchain.ps1 on one line (or use ^ for cmd continuation), not PowerShell backticks."
 }
 
 $requiredDirectories = @(

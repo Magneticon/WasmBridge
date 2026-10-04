@@ -7,7 +7,7 @@ Use Windows 10 with Visual Studio 2022, the `v141_xp` toolset and Windows 7.1A S
 WasmBridge keeps its pinned host-side WebAssembly toolchain inside the repository under `Toolchain\`. If you already have the prepared toolset elsewhere, import it once:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File Tools\Import-Toolchain.ps1 -Source E:\GPT\CODEX\CODEX\DATA\WasmBridge -Clean
+powershell -ExecutionPolicy Bypass -File Tools\Import-Toolchain.ps1 -Source yoursourcelocation -Clean
 ```
 
 Expected bundled directories are:

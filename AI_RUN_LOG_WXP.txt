@@ -1,8 +1,0 @@
-DBGRun architecture: x64
-Target architecture: x64 (PE machine 0x8664)
-Target type: managed CLR
-DBGRun mode: managed CLR under native debugger; stdout/stderr capture enabled
-PASS: valid and invalid headers handled.
-ERROR: Unable to load DLL 'WasmBridge.Native.dll': The specified module could not be found. (Exception from HRESULT: 0x8007007E)
-
-DBGRun result: EXIT  code=1 (0x00000001)

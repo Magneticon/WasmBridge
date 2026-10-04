@@ -15,6 +15,6 @@ Toolchain/
 
 The Windows XP runtime/browser machine does **not** need this toolchain. It is for building, validating and packaging WasmBridge on the development host.
 
-Use `Tools\Import-Toolchain.ps1` to copy an existing prepared toolset into this directory. The importer deliberately omits nested source-control metadata and transient caches.
+Use `Tools\Import-Toolchain.ps1` to copy an existing prepared toolset into this directory. The importer deliberately omits nested source-control metadata, transient caches and development-only artifacts that WasmBridge does not consume. In particular, Binaryen's large `lib\binaryen.lib` static library is excluded because WasmBridge invokes `wasm-opt.exe` and `wasm2js.exe` as external programs and never links against Binaryen.
 
 The third-party projects remain under their own licenses. Keep their original license/notice files with the copied tool directories and see `THIRD_PARTY_NOTICES.md` for WasmBridge's notices.

@@ -24,7 +24,6 @@ Toolchain\
   binaryen-version_133\
   emsdk\
   esbuild-0.28.2\
-  Firefox52-TestProfile\
   wabt-1.0.42\
 ```
 
@@ -35,6 +34,8 @@ powershell -ExecutionPolicy Bypass -File Tools\Import-Toolchain.ps1 -Source E:\G
 ```
 
 After import, normal build/test scripts automatically use `Toolchain\`. `WASMBRIDGE_TOOLS`, `WASMBRIDGE_LLVM`, `-ToolRoot` and related switches remain explicit overrides only.
+
+A live Firefox profile is intentionally not bundled: it is mutable browser state rather than a build dependency. Firefox 52 compatibility is established by the real XP acceptance test.
 
 The Windows XP runtime machine does not need Node, LLVM, Emscripten, WABT, Binaryen or esbuild; those are host-side SDK components.
 

@@ -26,7 +26,7 @@ if (-not $artifactRoot.StartsWith($repoRoot + [IO.Path]::DirectorySeparatorChar,
 New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null
 $sourceCommit = (& git -C $repo rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or [String]::IsNullOrEmpty($sourceCommit)) { throw "Unable to determine the source Git commit." }
-$requiredToolchain = @("binaryen-version_133", "emsdk", "esbuild-0.28.2", "Firefox52-TestProfile", "wabt-1.0.42")
+$requiredToolchain = @("binaryen-version_133", "emsdk", "esbuild-0.28.2", "wabt-1.0.42")
 
 function Assert-SafeTarget([string]$Path) {
     $resolved = [IO.Path]::GetFullPath($Path)
@@ -47,6 +47,11 @@ function Copy-TrackedTree([string]$Stage, [string]$Tree) {
     if ($paths.Count -eq 0) { throw "Tracked release tree is empty or missing: $Tree" }
     foreach ($relative in $paths) {
         if ([String]::IsNullOrWhiteSpace($relative)) { continue }
+        $normalized = $relative.Replace('\', '/')
+        # A historical CODEX tools directory contained a live Firefox profile.
+        # It is mutable browser state, is not consumed by WasmBridge, and must
+        # never enter release archives even if an older checkout tracks it.
+        if ($normalized.StartsWith("Toolchain/Firefox52-TestProfile/", [StringComparison]::OrdinalIgnoreCase)) { continue }
         Copy-ReleaseFile $Stage $relative $relative
     }
 }

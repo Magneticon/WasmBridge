@@ -20,19 +20,19 @@ if ([String]::IsNullOrEmpty($Destination)) {
     $Destination = Join-Path $repo "Toolchain"
 }
 
-# A PowerShell backtick is a line-continuation character only when interpreted
-# by PowerShell itself. If this script is launched from cmd.exe with copied
-# multi-line PowerShell syntax, a literal backtick can otherwise become a path.
 $backtick = [string][char]96
 if ($Source.Trim() -eq $backtick -or $Destination.Trim() -eq $backtick) {
     throw "A literal backtick was passed as a path. From cmd.exe, run Import-Toolchain.ps1 on one line (or use ^ for cmd continuation), not PowerShell backticks."
 }
 
+# Only deterministic build/validation dependencies belong in the SDK toolchain.
+# A live Firefox profile is intentionally not imported: it is mutable browser
+# state (cookies/cache/history/locks), is not consumed by WasmBridge scripts,
+# and the authoritative Firefox 52 acceptance run is performed on the XP host.
 $requiredDirectories = @(
     "binaryen-version_133",
     "emsdk",
     "esbuild-0.28.2",
-    "Firefox52-TestProfile",
     "wabt-1.0.42"
 )
 

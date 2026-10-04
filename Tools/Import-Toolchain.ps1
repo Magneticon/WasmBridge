@@ -80,9 +80,13 @@ foreach ($relative in $requiredDirectories) {
     $to = Join-Path $Destination $relative
     New-Item -ItemType Directory -Force -Path $to | Out-Null
 
+    # Keep everything required to execute the pinned toolchain, but omit
+    # development-only/static-link artifacts that WasmBridge never consumes.
+    # Binaryen's binaryen.lib is ~472 MiB and is not used because WasmBridge
+    # invokes wasm-opt.exe and wasm2js.exe as external tools.
     & robocopy $from $to /E /COPY:DAT /DCOPY:DAT /R:1 /W:1 /NFL /NDL /NJH /NJS /NP `
         /XD .git .cache __pycache__ .pytest_cache node_modules `
-        /XF .gitignore .gitattributes *.pyc *.tmp *.log
+        /XF .gitignore .gitattributes *.pyc *.tmp *.log binaryen.lib
     $code = $LASTEXITCODE
     if ($code -gt 7) {
         throw "robocopy failed for $relative with exit code $code."

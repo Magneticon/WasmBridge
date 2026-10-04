@@ -23,7 +23,8 @@ if ([String]::IsNullOrEmpty($Destination)) {
 # A PowerShell backtick is a line-continuation character only when interpreted
 # by PowerShell itself. If this script is launched from cmd.exe with copied
 # multi-line PowerShell syntax, a literal backtick can otherwise become a path.
-if ($Source.Trim() -eq "`" -or $Destination.Trim() -eq "`") {
+$backtick = [string][char]96
+if ($Source.Trim() -eq $backtick -or $Destination.Trim() -eq $backtick) {
     throw "A literal backtick was passed as a path. From cmd.exe, run Import-Toolchain.ps1 on one line (or use ^ for cmd continuation), not PowerShell backticks."
 }
 

@@ -1,10 +1,8 @@
 # WasmBridge
 
-WasmBridge is a reusable WebAssembly compilation, packaging and browser-runtime framework with an unusually old compatibility baseline: **Firefox 52.9 ESR on Windows XP**, while also supporting newer engines.
+WasmBridge is a reusable WebAssembly compilation, packaging and browser-runtime framework with following compatibility baseline: **Firefox 52.9 ESR on Windows XP**, while also supporting newer engines.
 
 ## Current release: 0.8.0
-
-WasmBridge 0.8 removes the old prototype-wide 16 MiB buffer, 32 MiB linear-memory and 128-allocation ceilings. The general allocator/runtime now grows until the WebAssembly engine, browser process or optional application quota refuses further growth.
 
 The runtime is address-width aware:
 
@@ -15,7 +13,7 @@ Browser-process bitness and Wasm address width are separate properties. A 64-bit
 
 ## Self-contained SDK/toolchain
 
-WasmBridge is designed to be a self-contained SDK tree. Pinned host-side dependencies live under `Toolchain\` instead of requiring a machine-specific `C:\CODEX\TOOLS\WasmBridge` installation.
+WasmBridge is designed to be a self-contained SDK tree. Pinned host-side dependencies live under `Toolchain\`.
 
 Expected bundled layout:
 
@@ -30,7 +28,7 @@ Toolchain\
 If you already have the prepared toolset elsewhere, import it once:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File Tools\Import-Toolchain.ps1 -Source E:\GPT\CODEX\CODEX\DATA\WasmBridge -Clean
+powershell -ExecutionPolicy Bypass -File Tools\Import-Toolchain.ps1 -Source yoursourcehere -Clean
 ```
 
 After import, normal build/test scripts automatically use `Toolchain\`. `WASMBRIDGE_TOOLS`, `WASMBRIDGE_LLVM`, `-ToolRoot` and related switches remain explicit overrides only.
@@ -100,13 +98,13 @@ For a Windows 10 host that does not contain Firefox 52, run the host matrix with
 For the XP browser over the LAN, run on the Windows 10 host:
 
 ```text
-node Tools\Serve-Examples.js 8084 192.168.255.2
+node Tools\Serve-Examples.js port ipaddress
 ```
 
 and open on XP:
 
 ```text
-http://192.168.255.2:8084/Examples/WasmSelfTest/index.html
+http://ipaddress:port/Examples/WasmSelfTest/index.html
 ```
 
 The native self-test verifies wasm32 addressing, growth beyond the former 32 MiB ceiling and more than 128 simultaneous allocations.
@@ -126,12 +124,9 @@ Use `-Flavor Complete` or `-Flavor Runtime` to generate only one flavor. The leg
 
 ## Documentation
 
-- [`Documentation/WasmBridge_0.8_Architecture_API_Programming_Reference.pdf`](Documentation/WasmBridge_0.8_Architecture_API_Programming_Reference.pdf) — black-and-white architecture, API and programming-reference manual.
+- [`Documentation/WasmBridge_0.8_Architecture_API_Programming_Reference.pdf`](Documentation/WasmBridge_0.8_Architecture_API_Programming_Reference.pdf) — architecture, API and programming-reference manual.
 - [`Documentation/PROGRAMMING_GUIDE.md`](Documentation/PROGRAMMING_GUIDE.md) — source-language migration and programming guide.
 - [`Documentation/API_REFERENCE.md`](Documentation/API_REFERENCE.md) — runtime/CLI API reference.
 - [`Documentation/MEMORY_AND_ADDRESSING.md`](Documentation/MEMORY_AND_ADDRESSING.md) — wasm32, memory64, process bitness, allocator and quota model.
-- [`Documentation/FF52_COMPATIBILITY.md`](Documentation/FF52_COMPATIBILITY.md) — Firefox 52 syntax/toolchain profile.
 - [`Documentation/GETTING_STARTED.md`](Documentation/GETTING_STARTED.md) — setup and first module.
-- [`Documentation/XP_FIREFOX_TEST_ENDPOINT.md`](Documentation/XP_FIREFOX_TEST_ENDPOINT.md) — standard XP LAN test endpoint.
-- [`Documentation/VALIDATION_0.8.0.md`](Documentation/VALIDATION_0.8.0.md) — release acceptance matrix including the real XP/Firefox 52 run.
 - [`Toolchain/README.md`](Toolchain/README.md) — bundled toolchain layout and policy.

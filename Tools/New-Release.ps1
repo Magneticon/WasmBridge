@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$Version = $(Get-Content -LiteralPath (Join-Path (Split-Path $PSScriptRoot -Parent) "VERSION") -Raw).Trim(),
-    [string]$OutputDirectory = $(Join-Path (Split-Path $PSScriptRoot -Parent) "artifacts"),
+    [string]$Version,
+    [string]$OutputDirectory,
     [ValidateSet("Both", "Complete", "Runtime")]
     [string]$Flavor = "Both",
     [switch]$SkipValidation,
@@ -9,14 +9,28 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$repo = Split-Path -Parent $PSScriptRoot
+
+# Do not use $PSScriptRoot in parameter default expressions. Windows PowerShell
+# can evaluate those defaults before $PSScriptRoot has been populated, notably
+# when the script is launched through powershell.exe -File from cmd.exe.
+$scriptPath = $MyInvocation.MyCommand.Path
+if ([String]::IsNullOrEmpty($scriptPath)) { throw "Unable to determine New-Release.ps1 path." }
+$scriptDirectory = Split-Path -Parent $scriptPath
+$repo = Split-Path -Parent $scriptDirectory
+if ([String]::IsNullOrWhiteSpace($Version)) {
+    $Version = (Get-Content -LiteralPath (Join-Path $repo "VERSION") -Raw).Trim()
+}
+if ([String]::IsNullOrWhiteSpace($OutputDirectory)) {
+    $OutputDirectory = Join-Path $repo "artifacts"
+}
+
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Version must use major.minor.patch." }
 if ($RuntimeOnly) {
     if ($PSBoundParameters.ContainsKey("Flavor") -and $Flavor -ne "Runtime") { throw "-RuntimeOnly cannot be combined with -Flavor $Flavor. Use -Flavor Runtime instead." }
     $Flavor = "Runtime"
 }
 if (-not $SkipValidation) {
-    & (Join-Path $PSScriptRoot "Test-All.ps1") -SkipFirefox
+    & (Join-Path $scriptDirectory "Test-All.ps1") -SkipFirefox
     if ($LASTEXITCODE -ne 0) { throw "Validation failed." }
 }
 
